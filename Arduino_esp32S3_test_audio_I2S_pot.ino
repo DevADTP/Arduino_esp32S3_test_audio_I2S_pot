@@ -17,15 +17,15 @@
 //use for turn off red light indicator after 10s
 #define TIME_PICTURE_END  10000    //milliseconds (10s)
 
-#define ROTARY_ENCODER_A_PIN 48
-#define ROTARY_ENCODER_B_PIN 47
-#define ROTARY_ENCODER_BUTTON_PIN 21
-#define ROTARY_ENCODER_VCC_PIN 19
+#define ROTARY_ENCODER_A_PIN 5
+#define ROTARY_ENCODER_B_PIN 6
+#define ROTARY_ENCODER_BUTTON_PIN 7
+#define ROTARY_ENCODER_VCC_PIN 17
 #define ROTARY_ENCODER_STEPS 4
 #define CYCLE_ROT  24
 
 //instead of changing here, rather change numbers above
-//AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
+AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
 
 //neopixel
 #define PIN_NEOPIXEL 40
@@ -37,8 +37,8 @@
 
 Audio audio;
 
-String ssid =    "*******************";
-String password = "******************";
+String ssid =    "*********";
+String password = "*******";
 
 long int valVolume = 0;
 long int valVolumeold = 0;
@@ -78,56 +78,56 @@ unsigned long ulong_time_picture = 0;  //TIME_PICTURE_END
 
 
 
-//void rotary_onButtonClick()
-//{
-//  static unsigned long lastTimePressed = 0;
-//  //ignore multiple press in that time milliseconds
-//  if (millis() - lastTimePressed < 500)
-//  {
-//    return;
-//  }
-//  lastTimePressed = millis();
-//  Serial.print("button pressed ");
-//  Serial.print(millis());
-//  Serial.println(" milliseconds after restart");
-//
-//  if (flip_light == 1)
-//  {
-//    flip_light = 0;
-//  }
-//  else
-//  {
-//    flip_light = 1;
-//  }
-//
-//  ulong_time_picture = millis() + TIME_PICTURE_END;
-//
-//}
-//
-//
-//
-//void rotary_loop()
-//{
-//  //dont print anything unless value changed
-//  if (rotaryEncoder.encoderChanged())
-//  {
-//    //Serial.print("Value: ");
-//    numero_led = rotaryEncoder.readEncoder();
-//    Serial.println(numero_led);
-//    ulong_time_picture = millis() + TIME_PICTURE_END;
-//  }
-//  if (rotaryEncoder.isEncoderButtonClicked())
-//  {
-//    rotary_onButtonClick();
-//  }
-//}
-//
-//
-//
-//void IRAM_ATTR readEncoderISR()
-//{
-//  rotaryEncoder.readEncoder_ISR();
-//}
+void rotary_onButtonClick()
+{
+  static unsigned long lastTimePressed = 0;
+  //ignore multiple press in that time milliseconds
+  if (millis() - lastTimePressed < 500)
+  {
+    return;
+  }
+  lastTimePressed = millis();
+  Serial.print("button pressed ");
+  Serial.print(millis());
+  Serial.println(" milliseconds after restart");
+
+  if (flip_light == 1)
+  {
+    flip_light = 0;
+  }
+  else
+  {
+    flip_light = 1;
+  }
+
+  ulong_time_picture = millis() + TIME_PICTURE_END;
+
+}
+
+
+
+void rotary_loop()
+{
+  //dont print anything unless value changed
+  if (rotaryEncoder.encoderChanged())
+  {
+    //Serial.print("Value: ");
+    numero_led = rotaryEncoder.readEncoder();
+    Serial.println(numero_led);
+    ulong_time_picture = millis() + TIME_PICTURE_END;
+  }
+  if (rotaryEncoder.isEncoderButtonClicked())
+  {
+    rotary_onButtonClick();
+  }
+}
+
+
+
+void IRAM_ATTR readEncoderISR()
+{
+  rotaryEncoder.readEncoder_ISR();
+}
 
 
 
@@ -155,34 +155,34 @@ void setup() {
   Serial.println("wifi ok");
   delay(1500);
 
-Serial.println("init neopixel");
+  Serial.println("init neopixel");
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
   FastLED.setBrightness( BRIGHTNESS );
 
-Serial.println("init rotary");
+  Serial.println("init rotary");
   pinMode(ROTARY_ENCODER_A_PIN, INPUT_PULLUP);
   pinMode(ROTARY_ENCODER_B_PIN, INPUT_PULLUP);
   pinMode(ROTARY_ENCODER_BUTTON_PIN, INPUT_PULLUP);
 
-//  //we must initialize rotary encoder
-//  rotaryEncoder.begin();
-//  rotaryEncoder.setup(readEncoderISR);
-//  //set boundaries and if values should cycle or not
-//  //in this example we will set possible values between 0 and 1000;
-//  bool circleValues = true;
-//  rotaryEncoder.setBoundaries(0, CYCLE_ROT, circleValues); //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
-//
-//  /*Rotary acceleration introduced 25.2.2021.
-//     in case range to select is huge, for example - select a value between 0 and 1000 and we want 785
-//     without accelerateion you need long time to get to that number
-//     Using acceleration, faster you turn, faster wil
-//     l the value raise.
-//     For fine tuning slow down.
-//  */
-//  //rotaryEncoder.disableAcceleration(); //acceleration is now enabled by default - disable if you dont need it
-//  rotaryEncoder.setAcceleration(1); //250 or set the value - larger number = more accelearation; 0 or 1 means disabled acceleration
-//
-//  ulong_time_picture = millis() + TIME_PICTURE_END;
+  //we must initialize rotary encoder
+  rotaryEncoder.begin();
+  rotaryEncoder.setup(readEncoderISR);
+  //set boundaries and if values should cycle or not
+  //in this example we will set possible values between 0 and 1000;
+  bool circleValues = true;
+  rotaryEncoder.setBoundaries(0, CYCLE_ROT, circleValues); //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
+
+  /*Rotary acceleration introduced 25.2.2021.
+     in case range to select is huge, for example - select a value between 0 and 1000 and we want 785
+     without accelerateion you need long time to get to that number
+     Using acceleration, faster you turn, faster wil
+     l the value raise.
+     For fine tuning slow down.
+  */
+  //rotaryEncoder.disableAcceleration(); //acceleration is now enabled by default - disable if you dont need it
+  rotaryEncoder.setAcceleration(1); //250 or set the value - larger number = more accelearation; 0 or 1 means disabled acceleration
+
+  ulong_time_picture = millis() + TIME_PICTURE_END;
 
 
   //audio web radio
@@ -191,8 +191,6 @@ Serial.println("init rotary");
   audio.connecttohost("http://vis.media-ice.musicradio.com/CapitalMP3");
 
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
-
-
 }
 
 
@@ -203,7 +201,7 @@ void loop()
   ulong_time_now = millis();
 
   //in loop call your custom function which will process rotary encoder values
-  //rotary_loop();
+  rotary_loop();
 
   //PART button play change power audio
   readButPlay = digitalRead(PIN_BUTTON_PLAY);
@@ -308,35 +306,35 @@ void loop()
     {
       //      Serial.println(updatevolume);
       //init all led with OFF or ON
-//      for (i = 0; i < NUM_LEDS; i++)
-//      {
-//        if (flip_light == 1)
-//        {
-//          leds[i] = CRGB::White;
-//        }
-//        else
-//        {
-//          leds[i] = CRGB::Black;
-//        }
-//      }
-//
-//      if (ulong_time_now >= ulong_time_picture)
-//      {
-//        if (flip_light == 1)
-//        {
-//          leds[numero_led] = CRGB::White;
-//        }
-//        else
-//        {
-//          leds[numero_led] = CRGB::Black;
-//        }
-//      }
-//      else
-//      {
-//        leds[numero_led] = CRGB::Red;
-//      }
-//
-//      FastLED.show();
+            for (i = 0; i < NUM_LEDS; i++)
+            {
+              if (flip_light == 1)
+              {
+                leds[i] = CRGB::White;
+              }
+              else
+              {
+                leds[i] = CRGB::Black;
+              }
+            }
+      
+            if (ulong_time_now >= ulong_time_picture)
+            {
+              if (flip_light == 1)
+              {
+                leds[numero_led] = CRGB::White;
+              }
+              else
+              {
+                leds[numero_led] = CRGB::Black;
+              }
+            }
+            else
+            {
+              leds[numero_led] = CRGB::Red;
+            }
+      
+            FastLED.show();
     }
 
   }
