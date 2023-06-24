@@ -1,8 +1,18 @@
-#include "Arduino.h"
-#include "WiFi.h"
-#include "Audio.h"
+/*
+carte dev
+ - esp32 : https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+librairies
+ - audio I2S : https://github.com/schreibfaul1/ESP32-audioI2S.git
+ - neopixel  : https://github.com/FastLED/FastLED.git
+ - rotary encoder : https://github.com/igorantolic/ai-esp32-rotary-encoder.git1
+ */
+
+#include <Arduino.h>
+#include <WiFi.h>
+#include <Audio.h>
 #include <FastLED.h>
-#include "AiEsp32RotaryEncoder.h"
+#include <AiEsp32RotaryEncoder.h>
 
 #define I2S_DOUT    35
 #define I2S_BCLK    36
