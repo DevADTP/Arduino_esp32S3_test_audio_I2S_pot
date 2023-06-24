@@ -1,18 +1,28 @@
 /*
-carte dev
- - esp32 : https://espressif.github.io/arduino-esp32/package_esp32_index.json
+  carte dev
+  - esp32 : https://espressif.github.io/arduino-esp32/package_esp32_index.json
 
-librairies
- - audio I2S : https://github.com/schreibfaul1/ESP32-audioI2S.git
- - neopixel  : https://github.com/FastLED/FastLED.git
- - rotary encoder : https://github.com/igorantolic/ai-esp32-rotary-encoder.git1
- */
+  librairies
+  - audio I2S : https://github.com/schreibfaul1/ESP32-audioI2S.git
+  - neopixel  : https://github.com/FastLED/FastLED.git
+  - rotary encoder : https://github.com/igorantolic/ai-esp32-rotary-encoder.git1
+*/
 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Audio.h>
 #include <FastLED.h>
 #include <AiEsp32RotaryEncoder.h>
+#include "SD.h"
+#include "FS.h"
+#include "SPIFFS.h"
+#include "SPI.h"
+
+// Digital I/O used
+#define SD_CS         10
+#define SPI_MOSI      11    // SD Card
+#define SPI_MISO      13
+#define SPI_SCK       12
 
 #define I2S_DOUT    35
 #define I2S_BCLK    36
@@ -141,14 +151,247 @@ void IRAM_ATTR readEncoderISR()
 
 
 
+void initSDCard() {
+  if (!SD.begin()) {
+    Serial.println("Card Mount Failed");
+    return;
+  }
+  uint8_t cardType = SD.cardType();
+
+  if (cardType == CARD_NONE) {
+    Serial.println("No SD card attached");
+    return;
+  }
+
+  Serial.print("SD Card Type: ");
+  if (cardType == CARD_MMC) {
+    Serial.println("MMC");
+  } else if (cardType == CARD_SD) {
+    Serial.println("SDSC");
+  } else if (cardType == CARD_SDHC) {
+    Serial.println("SDHC");
+  } else {
+    Serial.println("UNKNOWN");
+  }
+  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+  Serial.printf("SD Card Size: %lluMB\n", cardSize);
+}
+
+
+
+void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
+  Serial.printf("Listing directory: %s\n", dirname);
+
+  File root = fs.open(dirname);
+  if (!root) {
+    Serial.println("Failed to open directory");
+    return;
+  }
+  if (!root.isDirectory()) {
+    Serial.println("Not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      Serial.print("  DIR : ");
+      //Serial.println(file.name());
+      if (levels) {
+        char addslash[100];
+        strcpy(addslash, "/");
+        strcat(addslash, file.name());
+        Serial.println(addslash);
+        listDir(fs,addslash, levels - 1);
+        //listDir(fs,file.name(), levels - 1);
+      }
+    } else {
+      Serial.print("  FILE: ");
+      Serial.print(file.name());
+      Serial.print("  SIZE: ");
+      Serial.println(file.size());
+    }
+    file = root.openNextFile();
+  }
+}
+
+void createDir(fs::FS &fs, const char * path) {
+  Serial.printf("Creating Dir: %s\n", path);
+  if (fs.mkdir(path)) {
+    Serial.println("Dir created");
+  } else {
+    Serial.println("mkdir failed");
+  }
+}
+
+void removeDir(fs::FS &fs, const char * path) {
+  Serial.printf("Removing Dir: %s\n", path);
+  if (fs.rmdir(path)) {
+    Serial.println("Dir removed");
+  } else {
+    Serial.println("rmdir failed");
+  }
+}
+
+void readFile(fs::FS &fs, const char * path) {
+  Serial.printf("Reading file: %s\n", path);
+
+  File file = fs.open(path);
+  if (!file) {
+    Serial.println("Failed to open file for reading");
+    return;
+  }
+
+  Serial.print("Read from file: ");
+  while (file.available()) {
+    Serial.write(file.read());
+  }
+  file.close();
+}
+
+void writeFile(fs::FS &fs, const char * path, const char * message) {
+  Serial.printf("Writing file: %s\n", path);
+
+  File file = fs.open(path, FILE_WRITE);
+  if (!file) {
+    Serial.println("Failed to open file for writing");
+    return;
+  }
+  if (file.print(message)) {
+    Serial.println("File written");
+  } else {
+    Serial.println("Write failed");
+  }
+  file.close();
+}
+
+void appendFile(fs::FS &fs, const char * path, const char * message) {
+  Serial.printf("Appending to file: %s\n", path);
+
+  File file = fs.open(path, FILE_APPEND);
+  if (!file) {
+    Serial.println("Failed to open file for appending");
+    return;
+  }
+  if (file.print(message)) {
+    Serial.println("Message appended");
+  } else {
+    Serial.println("Append failed");
+  }
+  file.close();
+}
+
+void renameFile(fs::FS &fs, const char * path1, const char * path2) {
+  Serial.printf("Renaming file %s to %s\n", path1, path2);
+  if (fs.rename(path1, path2)) {
+    Serial.println("File renamed");
+  } else {
+    Serial.println("Rename failed");
+  }
+}
+
+void deleteFile(fs::FS &fs, const char * path) {
+  Serial.printf("Deleting file: %s\n", path);
+  if (fs.remove(path)) {
+    Serial.println("File deleted");
+  } else {
+    Serial.println("Delete failed");
+  }
+}
+
+void testFileIO(fs::FS &fs, const char * path) {
+  File file = fs.open(path);
+  static uint8_t buf[512];
+  size_t len = 0;
+  uint32_t start = millis();
+  uint32_t end = start;
+  if (file) {
+    len = file.size();
+    size_t flen = len;
+    start = millis();
+    while (len) {
+      size_t toRead = len;
+      if (toRead > 512) {
+        toRead = 512;
+      }
+      file.read(buf, toRead);
+      len -= toRead;
+    }
+    end = millis() - start;
+    Serial.printf("%u bytes read for %u ms\n", flen, end);
+    file.close();
+  } else {
+    Serial.println("Failed to open file for reading");
+  }
+
+
+  file = fs.open(path, FILE_WRITE);
+  if (!file) {
+    Serial.println("Failed to open file for writing");
+    return;
+  }
+
+  size_t i;
+  start = millis();
+  for (i = 0; i < 2048; i++) {
+    file.write(buf, 512);
+  }
+  end = millis() - start;
+  Serial.printf("%u bytes written for %u ms\n", 2048 * 512, end);
+  file.close();
+}
+
+
+
 void setup() {
   delay(1000);
   Serial.begin(2000000);
   while (!Serial) {
   }
-
+  Serial.println("************************************************************");
   Serial.println("START PROGRAM");
+  Serial.println("************************************************************");
 
+  Serial.println("SPI board default:");
+  Serial.print("MOSI: ");
+  Serial.println(MOSI);
+  Serial.print("MISO: ");
+  Serial.println(MISO);
+  Serial.print("SCK: ");
+  Serial.println(SCK);
+  Serial.print("SS: ");
+  Serial.println(SS);
+
+  //sd card
+  pinMode(SD_CS, OUTPUT);
+  digitalWrite(SD_CS, LOW);
+  delay(10);
+  digitalWrite(SD_CS, HIGH);
+  //SPI.begin(SCK, MISO, MOSI, SS);
+  SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, SD_CS);
+
+  //SD card
+  initSDCard();
+
+//  Serial.println("dir racine");
+//  listDir(SD, "/", 0);
+  Serial.println("Contenu carte SD : ");
+  listDir(SD, "/", 1);
+//  Serial.println("dir 01");
+//  listDir(SD, "/01", 0);
+
+  //  writeFile(SD, "/hello.txt", "Hello ");
+  //  appendFile(SD, "/hello.txt", "World!\n");
+  //  readFile(SD, "/hello.txt");
+  //  deleteFile(SD, "/foo.txt");
+  //  renameFile(SD, "/hello.txt", "/foo.txt");
+  //  readFile(SD, "/foo.txt");
+  //  testFileIO(SD, "/test.txt");
+  Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
+  Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
+
+
+  //wifi
   WiFi.disconnect();
 
   WiFi.mode(WIFI_STA);
@@ -198,7 +441,11 @@ void setup() {
   //audio web radio
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
   audio.setVolume(0);
-  audio.connecttohost("http://vis.media-ice.musicradio.com/CapitalMP3");
+  //stream music
+  //audio.connecttohost("http://vis.media-ice.musicradio.com/CapitalMP3");
+
+  //sd musique
+  audio.connecttoFS(SD, "/01/001.mp3");
 
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
 }
@@ -271,21 +518,21 @@ void loop()
     //Serial.print(valVolume);
     //Serial.print(",");
 
-    valVolume = (valVolume * 100) / 4095;
+    valVolume = (valVolume * 21) / 4095;
     //    Serial.print(valVolume);
     //    Serial.print(",");
 
-    if (valVolume >= 100) valVolume = 100;
+    if (valVolume >= 21) valVolume = 21;
     if (valVolume <= 0) valVolume = 0;
     //    Serial.print(valVolume);
     //    Serial.print(",");
 
-    if ( (valVolume - valVolumeold) > 5)
+    if ( (valVolume - valVolumeold) > 1)
     {
       updatevolume = 1;
     }
 
-    if ( (valVolumeold - valVolume) > 5)
+    if ( (valVolumeold - valVolume) > 1)
     {
       updatevolume = 1;
     }
@@ -297,14 +544,14 @@ void loop()
       Serial.println(updatevolume);
       updatevolume = 0;
       valVolumeold = valVolume;
-      audio.setVolume(valVolume);
+      audio.setVolume(valVolume); // 0...21
 
       for (i = 0; i < NUM_LEDS; i++)
       {
         leds[i] = CRGB::Black;
       }
 
-      for (i = 0; i < map(valVolume, 0, 100, 0, NUM_LEDS); i++)
+      for (i = 0; i < map(valVolume, 0, 21, 0, NUM_LEDS); i++)
       {
         couleur = CRGB(200, 0, 0);
         leds[i] = couleur;
@@ -316,35 +563,35 @@ void loop()
     {
       //      Serial.println(updatevolume);
       //init all led with OFF or ON
-            for (i = 0; i < NUM_LEDS; i++)
-            {
-              if (flip_light == 1)
-              {
-                leds[i] = CRGB::White;
-              }
-              else
-              {
-                leds[i] = CRGB::Black;
-              }
-            }
-      
-            if (ulong_time_now >= ulong_time_picture)
-            {
-              if (flip_light == 1)
-              {
-                leds[numero_led] = CRGB::White;
-              }
-              else
-              {
-                leds[numero_led] = CRGB::Black;
-              }
-            }
-            else
-            {
-              leds[numero_led] = CRGB::Red;
-            }
-      
-            FastLED.show();
+      for (i = 0; i < NUM_LEDS; i++)
+      {
+        if (flip_light == 1)
+        {
+          leds[i] = CRGB::White;
+        }
+        else
+        {
+          leds[i] = CRGB::Black;
+        }
+      }
+
+      if (ulong_time_now >= ulong_time_picture)
+      {
+        if (flip_light == 1)
+        {
+          leds[numero_led] = CRGB::White;
+        }
+        else
+        {
+          leds[numero_led] = CRGB::Black;
+        }
+      }
+      else
+      {
+        leds[numero_led] = CRGB::Red;
+      }
+
+      FastLED.show();
     }
 
   }
