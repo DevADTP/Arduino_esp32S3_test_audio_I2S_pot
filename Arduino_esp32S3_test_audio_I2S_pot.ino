@@ -18,21 +18,23 @@
 #include "SPIFFS.h"
 #include "SPI.h"
 
-// Digital I/O used
+// PINOUT SD CARD
 #define SD_CS         10
 #define SPI_MOSI      11    // SD Card
 #define SPI_MISO      13
 #define SPI_SCK       12
 
+//PINOUT I2S CARD (AUDIO 3W)
 #define I2S_DOUT    35
 #define I2S_BCLK    36
 #define I2S_LRC     37
 #define I2S_GAIN    39
 
+//potentiometre volume
 #define PIN_VOLUME   4
 
+//button PLAY (used as gain audio)
 #define PIN_BUTTON_PLAY 45
-
 
 //use for turn off red light indicator after 10s
 #define TIME_PICTURE_END  10000    //milliseconds (10s)
@@ -96,7 +98,9 @@ int flip_light = 0;
 unsigned long ulong_time_now = 0;
 unsigned long ulong_time_picture = 0;  //TIME_PICTURE_END
 
-
+int intNbAudioFileInDir = 0;
+int intNumeroDossier = 1;
+int intNombreDossier = 5;
 
 void rotary_onButtonClick()
 {
@@ -133,7 +137,30 @@ void rotary_loop()
   {
     //Serial.print("Value: ");
     numero_led = rotaryEncoder.readEncoder();
+    intNumeroDossier = (numero_led % intNombreDossier) + 1;
+
+    intNbAudioFileInDir = 0;
+    listDir(SD, "/05", 1);
+
+    Serial.print("Dossier:");
+    Serial.print("intNumeroDossier");
     Serial.println(numero_led);
+
+    Serial.println("Led anneau");
+    Serial.println(numero_led);
+
+    switch ( numero_led ) {
+      case 1:
+        audio.connecttoFS(SD, "/05/001.mp3");
+        break;
+      case 2:
+        audio.connecttoFS(SD, "/05/002.mp3");
+        break;
+      default:
+        audio.connecttoFS(SD, "/05/003.mp3");
+        break;
+    }
+
     ulong_time_picture = millis() + TIME_PICTURE_END;
   }
   if (rotaryEncoder.isEncoderButtonClicked())
@@ -195,24 +222,36 @@ void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
   File file = root.openNextFile();
   while (file) {
     if (file.isDirectory()) {
-      Serial.print("  DIR : ");
+      intNbAudioFileInDir = 0;
+      //Serial.print("  DIR : ");
       //Serial.println(file.name());
       if (levels) {
         char addslash[100];
         strcpy(addslash, "/");
         strcat(addslash, file.name());
-        Serial.println(addslash);
-        listDir(fs,addslash, levels - 1);
+        //Serial.println(addslash);
+        listDir(fs, addslash, levels - 1);
         //listDir(fs,file.name(), levels - 1);
       }
     } else {
+
+      intNbAudioFileInDir++;
+      char addfullpath[100];
       Serial.print("  FILE: ");
-      Serial.print(file.name());
+      strcpy(addfullpath, dirname);
+      strcat(addfullpath, "/");
+      strcat(addfullpath, file.name());
+      //Serial.print(file.name());
+      Serial.print(addfullpath);
       Serial.print("  SIZE: ");
       Serial.println(file.size());
     }
     file = root.openNextFile();
   }
+
+  Serial.print("File number:");
+  Serial.println(intNbAudioFileInDir);
+
 }
 
 void createDir(fs::FS &fs, const char * path) {
@@ -373,12 +412,20 @@ void setup() {
   //SD card
   initSDCard();
 
-//  Serial.println("dir racine");
-//  listDir(SD, "/", 0);
+  //  Serial.println("dir racine");
+  //  listDir(SD, "/", 0);
   Serial.println("Contenu carte SD : ");
+  intNbAudioFileInDir = 0;
   listDir(SD, "/", 1);
-//  Serial.println("dir 01");
-//  listDir(SD, "/01", 0);
+
+  intNbAudioFileInDir = 0;
+  listDir(SD, "/05", 0);
+
+  Serial.println("Contenu dossier 01 : ");
+  intNbAudioFileInDir = 0;
+  listDir(SD, "/01", 1);
+  //  Serial.println("dir 01");
+  //  listDir(SD, "/01", 0);
 
   //  writeFile(SD, "/hello.txt", "Hello ");
   //  appendFile(SD, "/hello.txt", "World!\n");
@@ -445,7 +492,8 @@ void setup() {
   //audio.connecttohost("http://vis.media-ice.musicradio.com/CapitalMP3");
 
   //sd musique
-  audio.connecttoFS(SD, "/01/001.mp3");
+  //audio.connecttoFS(SD, "/01/001.mp3");
+  audio.connecttoFS(SD, "/05/001.mp3");
 
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
 }
@@ -515,27 +563,13 @@ void loop()
     updateTimeVolume = nowTimeMillis + PERIOD_READ_VOLUME;
 
     valVolume = analogRead(PIN_VOLUME);
-    //Serial.print(valVolume);
-    //Serial.print(",");
-
     valVolume = (valVolume * 21) / 4095;
-    //    Serial.print(valVolume);
-    //    Serial.print(",");
 
     if (valVolume >= 21) valVolume = 21;
     if (valVolume <= 0) valVolume = 0;
-    //    Serial.print(valVolume);
-    //    Serial.print(",");
 
-    if ( (valVolume - valVolumeold) > 1)
-    {
-      updatevolume = 1;
-    }
-
-    if ( (valVolumeold - valVolume) > 1)
-    {
-      updatevolume = 1;
-    }
+    if ( (valVolume - valVolumeold) > 1) updatevolume = 1;
+    if ( (valVolumeold - valVolume) > 1) updatevolume = 1;
 
     if (updatevolume == 1)
     {
@@ -561,7 +595,7 @@ void loop()
     }
     else
     {
-      //      Serial.println(updatevolume);
+      //Serial.println(updatevolume);
       //init all led with OFF or ON
       for (i = 0; i < NUM_LEDS; i++)
       {
