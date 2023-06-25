@@ -17,6 +17,9 @@
 #include "FS.h"
 #include "SPIFFS.h"
 #include "SPI.h"
+#include "time.h"
+
+
 
 // PINOUT SD CARD
 #define SD_CS         10
@@ -69,6 +72,7 @@ int updatevolume = 0;
 unsigned long nowTimeMillis = 0;
 unsigned long updateTimeVolume = 0;
 unsigned long updateTimeGain = 0;
+unsigned long updateTimeHorloge = 0;
 
 int i = 0; //for
 
@@ -101,6 +105,14 @@ unsigned long ulong_time_picture = 0;  //TIME_PICTURE_END
 int intNbAudioFileInDir = 0;
 int intNumeroDossier = 1;
 int intNombreDossier = 5;
+
+
+//time NTP RTC
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 3600;
+const int   daylightOffset_sec = 3600;
+#define DISPLAY_TIME_PERIOD  60000   //60 seconde
+
 
 void rotary_onButtonClick()
 {
@@ -382,6 +394,53 @@ void testFileIO(fs::FS &fs, const char * path) {
 
 
 
+void printLocalTime() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    return;
+  }
+  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+
+  //Serial.print("Wait time ms:");
+  //updateTimeHorloge = timeinfo.tm_sec;
+  //Serial.print(updateTimeHorloge);
+  //Serial.print(" -- ");
+  updateTimeHorloge = millis() + (60 - timeinfo.tm_sec) * 1000;
+
+  //Serial.println(updateTimeHorloge);
+
+  //  Serial.print("Day of week: ");
+  //  Serial.println(&timeinfo, "%A");
+  //  Serial.print("Month: ");
+  //  Serial.println(&timeinfo, "%B");
+  //  Serial.print("Day of Month: ");
+  //  Serial.println(&timeinfo, "%d");
+  //  Serial.print("Year: ");
+  //  Serial.println(&timeinfo, "%Y");
+  //  Serial.print("Hour: ");
+  //  Serial.println(&timeinfo, "%H");
+  //  Serial.print("Hour (12 hour format): ");
+  //  Serial.println(&timeinfo, "%I");
+  //  Serial.print("Minute: ");
+  //  Serial.println(&timeinfo, "%M");
+  //  Serial.print("Second: ");
+  //  Serial.println(&timeinfo, "%S");
+
+  //  Serial.println("Time variables");
+  //  char timeHour[3];
+  //  strftime(timeHour, 3, "%H", &timeinfo);
+  //  Serial.println(timeHour);
+  //  char timeWeekDay[10];
+  //  strftime(timeWeekDay, 10, "%A", &timeinfo);
+  //  Serial.println(timeWeekDay);
+  //  Serial.println();
+
+
+}
+
+
+
 void setup() {
   delay(1000);
   Serial.begin(2000000);
@@ -455,6 +514,11 @@ void setup() {
   Serial.println("wifi ok");
   delay(1500);
 
+  //get time ntp
+  // Init and get the time
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  printLocalTime();
+
   Serial.println("init neopixel");
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
   FastLED.setBrightness( BRIGHTNESS );
@@ -504,6 +568,12 @@ void loop()
 {
   nowTimeMillis = millis();
   ulong_time_now = millis();
+
+  //update dispay time
+  if ( millis() > updateTimeHorloge )
+  {
+    printLocalTime();
+  }
 
   //in loop call your custom function which will process rotary encoder values
   rotary_loop();
