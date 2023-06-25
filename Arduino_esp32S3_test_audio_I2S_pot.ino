@@ -6,6 +6,7 @@
   - audio I2S : https://github.com/schreibfaul1/ESP32-audioI2S.git
   - neopixel  : https://github.com/FastLED/FastLED.git
   - rotary encoder : https://github.com/igorantolic/ai-esp32-rotary-encoder.git1
+  - RTC PCF8563 : https://github.com/adafruit/RTClib.git
 */
 
 #include <Arduino.h>
@@ -19,7 +20,8 @@
 #include "SPI.h"
 #include "time.h"
 
-
+#include "RTClib.h"
+#include <Wire.h>
 
 // PINOUT SD CARD
 #define SD_CS         10
@@ -32,6 +34,11 @@
 #define I2S_BCLK    36
 #define I2S_LRC     37
 #define I2S_GAIN    39
+
+//PINOUT I2C RTC PCF8563
+#define SDA_PIN_RTC_PCF8563  15
+#define SCL_PIN_RTC_PCF8563  16
+#define IRQ_PIN_RTC_PCF8563  17
 
 //potentiometre volume
 #define PIN_VOLUME   4
@@ -112,6 +119,20 @@ const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 3600;
 const int   daylightOffset_sec = 3600;
 #define DISPLAY_TIME_PERIOD  60000   //60 seconde
+RTC_PCF8563 rtc;
+DateTime now;
+struct tm timeinfo;
+
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+// flag to update serial; set in interrupt callback
+volatile uint8_t tick_tock = 1;
+
+// INT0 interrupt callback; update tick_tock flag
+void set_tick_tock(void) {
+  tick_tock = 1;
+}
+
 
 
 void rotary_onButtonClick()
@@ -168,8 +189,74 @@ void rotary_loop()
       case 2:
         audio.connecttoFS(SD, "/05/002.mp3");
         break;
-      default:
+      case 3:
         audio.connecttoFS(SD, "/05/003.mp3");
+        break;
+      case 4:
+        audio.connecttoFS(SD, "/05/004.mp3");
+        break;
+      case 5:
+        audio.connecttoFS(SD, "/05/005.mp3");
+        break;
+      case 6:
+        audio.connecttoFS(SD, "/05/006.mp3");
+        break;
+      case 7:
+        audio.connecttoFS(SD, "/05/007.mp3");
+        break;
+      case 8:
+        audio.connecttoFS(SD, "/05/008.mp3");
+        break;
+      case 9:
+        audio.connecttoFS(SD, "/01/001.mp3");
+        break;
+      case 10:
+        audio.connecttoFS(SD, "/01/002.mp3");
+        break;
+      case 11:
+        audio.connecttoFS(SD, "/02/001.mp3");
+        break;
+      case 12:
+        audio.connecttoFS(SD, "/02/002.mp3");
+        break;
+      case 13:
+        audio.connecttoFS(SD, "/02/003.mp3");
+        break;
+      case 14:
+        audio.connecttoFS(SD, "/02/004.mp3");
+        break;
+      case 15:
+        audio.connecttoFS(SD, "/02/005.mp3");
+        break;
+      case 16:
+        audio.connecttoFS(SD, "/03/001.mp3");
+        break;
+      case 17:
+        audio.connecttoFS(SD, "/03/001.mp3");
+        break;
+      case 18:
+        audio.connecttoFS(SD, "/03/002.mp3");
+        break;
+      case 19:
+        audio.connecttoFS(SD, "/03/003.mp3");
+        break;
+      case 20:
+        audio.connecttoFS(SD, "/03/004.mp3");
+        break;
+      case 21:
+        audio.connecttoFS(SD, "/04/001.mp3");
+        break;
+      case 22:
+        audio.connecttoFS(SD, "/04/002.mp3");
+        break;
+      case 23:
+        audio.connecttoFS(SD, "/06/001.mp3");
+        break;
+      case 24:
+        audio.connecttoFS(SD, "/06/002.mp3");
+        break;
+      default:
+        audio.connecttoFS(SD, "/04/001.mp3");
         break;
     }
 
@@ -395,7 +482,7 @@ void testFileIO(fs::FS &fs, const char * path) {
 
 
 void printLocalTime() {
-  struct tm timeinfo;
+
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
     return;
@@ -450,15 +537,29 @@ void setup() {
   Serial.println("START PROGRAM");
   Serial.println("************************************************************");
 
-  Serial.println("SPI board default:");
-  Serial.print("MOSI: ");
-  Serial.println(MOSI);
-  Serial.print("MISO: ");
-  Serial.println(MISO);
-  Serial.print("SCK: ");
-  Serial.println(SCK);
-  Serial.print("SS: ");
-  Serial.println(SS);
+  //I2C RTC
+  Wire.begin(SDA_PIN_RTC_PCF8563, SCL_PIN_RTC_PCF8563);  //SDA SCL
+  pinMode(IRQ_PIN_RTC_PCF8563, INPUT);        // set up interrupt pin
+  digitalWrite(IRQ_PIN_RTC_PCF8563, HIGH);    // turn on pullup resistors
+  // attach interrupt to set_tick_tock callback on rising edge of INT0
+  attachInterrupt(digitalPinToInterrupt(IRQ_PIN_RTC_PCF8563), set_tick_tock, RISING);
+
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    while (1) delay(10);
+  }
+
+  //SPI SDCARD
+//  Serial.println("SPI board default:");
+//  Serial.print("MOSI: ");
+//  Serial.println(MOSI);
+//  Serial.print("MISO: ");
+//  Serial.println(MISO);
+//  Serial.print("SCK: ");
+//  Serial.println(SCK);
+//  Serial.print("SS: ");
+//  Serial.println(SS);
 
   //sd card
   pinMode(SD_CS, OUTPUT);
@@ -473,16 +574,16 @@ void setup() {
 
   //  Serial.println("dir racine");
   //  listDir(SD, "/", 0);
-  Serial.println("Contenu carte SD : ");
-  intNbAudioFileInDir = 0;
-  listDir(SD, "/", 1);
-
-  intNbAudioFileInDir = 0;
-  listDir(SD, "/05", 0);
-
-  Serial.println("Contenu dossier 01 : ");
-  intNbAudioFileInDir = 0;
-  listDir(SD, "/01", 1);
+//  Serial.println("Contenu carte SD : ");
+//  intNbAudioFileInDir = 0;
+//  listDir(SD, "/", 1);
+//
+//  intNbAudioFileInDir = 0;
+//  listDir(SD, "/05", 0);
+//
+//  Serial.println("Contenu dossier 01 : ");
+//  intNbAudioFileInDir = 0;
+//  listDir(SD, "/01", 1);
   //  Serial.println("dir 01");
   //  listDir(SD, "/01", 0);
 
@@ -514,10 +615,35 @@ void setup() {
   Serial.println("wifi ok");
   delay(1500);
 
+  //  Serial.print("DATETIME avant: ");
+  //  Serial.print(__DATE__);
+  //  Serial.print(" - ");
+  //  Serial.println(__TIME__);
+
   //get time ntp
   // Init and get the time
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   printLocalTime();
+
+  //update time in RTC
+  //structure tm (int8_t wday, int16_t year, int8_t mon, int8_t mday, int8_t hour, int8_t min, int8_t sec)
+  // January 21, 2014 at 3am you would call:
+  // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  Serial.print("Extract time : ");
+  Serial.print(timeinfo.tm_year);
+  Serial.print("_");
+  Serial.print(timeinfo.tm_mon);
+  Serial.print("_");
+  Serial.print(timeinfo.tm_mday);
+  Serial.print("_");
+  Serial.print(timeinfo.tm_hour);
+  Serial.print("_");
+  Serial.print(timeinfo.tm_min);
+  Serial.print("_");
+  Serial.println(timeinfo.tm_sec);
+
+  rtc.adjust(DateTime(timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+  rtc.start();
 
   Serial.println("init neopixel");
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
@@ -557,7 +683,7 @@ void setup() {
 
   //sd musique
   //audio.connecttoFS(SD, "/01/001.mp3");
-  audio.connecttoFS(SD, "/05/001.mp3");
+  audio.connecttoFS(SD, "/04/001.mp3");
 
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
 }
@@ -573,6 +699,24 @@ void loop()
   if ( millis() > updateTimeHorloge )
   {
     printLocalTime();
+
+    //RTC PCF8563
+    now = rtc.now();
+
+    Serial.print(now.year(), DEC);
+    Serial.print('/');
+    Serial.print(now.month(), DEC);
+    Serial.print('/');
+    Serial.print(now.day(), DEC);
+    Serial.print(" (");
+    Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
+    Serial.print(") ");
+    Serial.print(now.hour(), DEC);
+    Serial.print(':');
+    Serial.print(now.minute(), DEC);
+    Serial.print(':');
+    Serial.print(now.second(), DEC);
+    Serial.println();
   }
 
   //in loop call your custom function which will process rotary encoder values
