@@ -44,7 +44,7 @@
 #define PIN_VOLUME   4
 
 //button PLAY (used as gain audio)
-#define PIN_BUTTON_PLAY 45
+#define PIN_BUTTON_PLAY 18
 
 //use for turn off red light indicator after 10s
 #define TIME_PICTURE_END  10000    //milliseconds (10s)
@@ -124,6 +124,10 @@ DateTime now;
 struct tm timeinfo;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+
+//wifi
+int intWifiConnectRetry = 0;
 
 // flag to update serial; set in interrupt callback
 volatile uint8_t tick_tock = 1;
@@ -549,17 +553,21 @@ void setup() {
     Serial.flush();
     while (1) delay(10);
   }
+  else
+  {
+    Serial.println("RTC PCF8563 detect");
+  }
 
   //SPI SDCARD
-//  Serial.println("SPI board default:");
-//  Serial.print("MOSI: ");
-//  Serial.println(MOSI);
-//  Serial.print("MISO: ");
-//  Serial.println(MISO);
-//  Serial.print("SCK: ");
-//  Serial.println(SCK);
-//  Serial.print("SS: ");
-//  Serial.println(SS);
+  //  Serial.println("SPI board default:");
+  //  Serial.print("MOSI: ");
+  //  Serial.println(MOSI);
+  //  Serial.print("MISO: ");
+  //  Serial.println(MISO);
+  //  Serial.print("SCK: ");
+  //  Serial.println(SCK);
+  //  Serial.print("SS: ");
+  //  Serial.println(SS);
 
   //sd card
   pinMode(SD_CS, OUTPUT);
@@ -574,16 +582,16 @@ void setup() {
 
   //  Serial.println("dir racine");
   //  listDir(SD, "/", 0);
-//  Serial.println("Contenu carte SD : ");
-//  intNbAudioFileInDir = 0;
-//  listDir(SD, "/", 1);
-//
-//  intNbAudioFileInDir = 0;
-//  listDir(SD, "/05", 0);
-//
-//  Serial.println("Contenu dossier 01 : ");
-//  intNbAudioFileInDir = 0;
-//  listDir(SD, "/01", 1);
+  //  Serial.println("Contenu carte SD : ");
+  //  intNbAudioFileInDir = 0;
+  //  listDir(SD, "/", 1);
+  //
+  //  intNbAudioFileInDir = 0;
+  //  listDir(SD, "/05", 0);
+  //
+  //  Serial.println("Contenu dossier 01 : ");
+  //  intNbAudioFileInDir = 0;
+  //  listDir(SD, "/01", 1);
   //  Serial.println("dir 01");
   //  listDir(SD, "/01", 0);
 
@@ -605,14 +613,23 @@ void setup() {
 
   WiFi.begin(ssid.c_str(), password.c_str());
 
-  Serial.print("WIFI:");
+  Serial.print("WIFI connect :");
   while (WiFi.status() != WL_CONNECTED)
   {
-
+    intWifiConnectRetry++;
     Serial.print(".");
     delay(500);
+    if (intWifiConnectRetry >= 20) break;
   }
-  Serial.println("wifi ok");
+
+  if (intWifiConnectRetry >= 20)
+  {
+    Serial.println("wifi PROBLEM not connected");
+  }
+  else
+  {
+    Serial.println("wifi OK");
+  }
   delay(1500);
 
   //  Serial.print("DATETIME avant: ");
