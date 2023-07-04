@@ -63,14 +63,18 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 #define PIN_NEOPIXEL 40
 #define PIN_NEOPIXEL_KIT 38
 
+//ADC boutton switch rotatif
+#define PIN_SWITCH_THEME 1
+#define PIN_SWITCH_USER 2
+
+//audio i2S
 #define PERIOD_READ_VOLUME   50  //ms
-
 #define PERIOD_CHANGE_GAIN   5000  //ms updateTimeGain
-
+#define PERIOD_READ_ADC   1000  //ms updateTimeGain
 Audio audio;
 
-String ssid =    "*********";
-String password = "*******";
+String ssid =    "ADTPBUREAUETUDE01";
+String password = "ADTP-BE-2020";
 
 long int valVolume = 0;
 long int valVolumeold = 0;
@@ -80,6 +84,7 @@ unsigned long nowTimeMillis = 0;
 unsigned long updateTimeVolume = 0;
 unsigned long updateTimeGain = 0;
 unsigned long updateTimeHorloge = 0;
+unsigned long updateAdcRead = 0 ;
 
 int i = 0; //for
 
@@ -91,6 +96,10 @@ int lastButtonState = HIGH;   // the previous reading from the input pin
 unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
 
+
+//adc
+int analogSwitchTheme = 0;
+int analogSwitchuser = 0;
 
 //fastled
 #define NUM_LEDS 24
@@ -534,12 +543,16 @@ void printLocalTime() {
 
 void setup() {
   delay(1000);
-  Serial.begin(2000000);
+  Serial.begin(115200);  //uart debug:2000000   uart_usb_otg:115200
   while (!Serial) {
   }
   Serial.println("************************************************************");
   Serial.println("START PROGRAM");
   Serial.println("************************************************************");
+
+  //ADC
+  //set the resolution to 12 bits (0-4096)
+  analogReadResolution(12);
 
   //I2C RTC
   Wire.begin(SDA_PIN_RTC_PCF8563, SCL_PIN_RTC_PCF8563);  //SDA SCL
@@ -711,6 +724,26 @@ void loop()
 {
   nowTimeMillis = millis();
   ulong_time_now = millis();
+
+  //read ADC value
+  //update dispay time
+  if ( millis() > updateAdcRead )
+  {
+    updateAdcRead = millis() + PERIOD_READ_ADC;
+
+    // switch theme
+    analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
+    Serial.printf("Switch theme = %d\n", analogSwitchTheme);
+    analogSwitchTheme = analogReadMilliVolts(PIN_SWITCH_THEME);
+    Serial.printf("ADC millivolts value = %d\n", analogSwitchTheme);
+
+    // user theme
+    analogSwitchuser = analogRead(PIN_SWITCH_USER);
+    Serial.printf("Switch theme = %d\n", analogSwitchuser);
+    analogSwitchuser = analogReadMilliVolts(PIN_SWITCH_USER);
+    Serial.printf("ADC millivolts value = %d\n", analogSwitchuser);
+
+  }
 
   //update dispay time
   if ( millis() > updateTimeHorloge )
