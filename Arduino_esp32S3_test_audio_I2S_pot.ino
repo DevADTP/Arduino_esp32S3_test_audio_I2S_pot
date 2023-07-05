@@ -9,6 +9,25 @@
   - RTC PCF8563 : https://github.com/adafruit/RTClib.git
 */
 
+//#if ARDUINO_USB_MODE
+//#warning This sketch should be used when USB is in OTG mode
+//void setup(){}
+//void loop(){}
+//#else
+//#include "USB.h"
+//#include "FirmwareMSC.h"
+//
+//#if !ARDUINO_USB_MSC_ON_BOOT
+//FirmwareMSC MSC_Update;
+//#endif
+//#if ARDUINO_USB_CDC_ON_BOOT
+//#define HWSerial Serial0
+//#define USBSerial Serial
+//#else
+//#define HWSerial Serial
+//USBCDC USBSerial;
+//#endif
+
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Audio.h>
@@ -24,37 +43,38 @@
 #include <Wire.h>
 
 // PINOUT SD CARD
-#define SD_CS         10
-#define SPI_MOSI      11    // SD Card
-#define SPI_MISO      13
-#define SPI_SCK       12
+#define SD_CS 10
+#define SPI_MOSI 11  // SD Card
+#define SPI_MISO 13
+#define SPI_SCK 12
 
 //PINOUT I2S CARD (AUDIO 3W)
-#define I2S_DOUT    35
-#define I2S_BCLK    36
-#define I2S_LRC     37
-#define I2S_GAIN    39
+#define I2S_DOUT 35
+#define I2S_BCLK 36
+#define I2S_LRC 37
+#define I2S_GAIN 39
+#define PIN_ENABLE_I2S 41
 
 //PINOUT I2C RTC PCF8563
-#define SDA_PIN_RTC_PCF8563  15
-#define SCL_PIN_RTC_PCF8563  16
-#define IRQ_PIN_RTC_PCF8563  17
+#define SDA_PIN_RTC_PCF8563 15
+#define SCL_PIN_RTC_PCF8563 16
+#define IRQ_PIN_RTC_PCF8563 17
 
 //potentiometre volume
-#define PIN_VOLUME   4
+#define PIN_VOLUME 4
 
 //button PLAY (used as gain audio)
 #define PIN_BUTTON_PLAY 18
 
 //use for turn off red light indicator after 10s
-#define TIME_PICTURE_END  10000    //milliseconds (10s)
+#define TIME_PICTURE_END 10000  //milliseconds (10s)
 
 #define ROTARY_ENCODER_A_PIN 5
 #define ROTARY_ENCODER_B_PIN 6
 #define ROTARY_ENCODER_BUTTON_PIN 7
 #define ROTARY_ENCODER_VCC_PIN 17
 #define ROTARY_ENCODER_STEPS 4
-#define CYCLE_ROT  24
+#define CYCLE_ROT 24
 
 //instead of changing here, rather change numbers above
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
@@ -67,14 +87,17 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 #define PIN_SWITCH_THEME 1
 #define PIN_SWITCH_USER 2
 
+//JACK CONNECTED
+#define PIN_ADC_JACK_DETECT 14
+
 //audio i2S
-#define PERIOD_READ_VOLUME   50  //ms
-#define PERIOD_CHANGE_GAIN   5000  //ms updateTimeGain
-#define PERIOD_READ_ADC   1000  //ms updateTimeGain
+#define PERIOD_READ_VOLUME 50    //ms
+#define PERIOD_CHANGE_GAIN 5000  //ms updateTimeGain
+#define PERIOD_READ_ADC 1000     //ms updateTimeGain
 Audio audio;
 
-String ssid =    "ADTPBUREAUETUDE01";
-String password = "ADTP-BE-2020";
+String ssid = "*****************";
+String password = "**********************";
 
 long int valVolume = 0;
 long int valVolumeold = 0;
@@ -84,15 +107,15 @@ unsigned long nowTimeMillis = 0;
 unsigned long updateTimeVolume = 0;
 unsigned long updateTimeGain = 0;
 unsigned long updateTimeHorloge = 0;
-unsigned long updateAdcRead = 0 ;
+unsigned long updateAdcRead = 0;
 
-int i = 0; //for
+int i = 0;  //for
 
 int changeGain = 0;
 
 int readButPlay = 0;
-int buttonState;             // the current reading from the input pin
-int lastButtonState = HIGH;   // the previous reading from the input pin
+int buttonState;                     // the current reading from the input pin
+int lastButtonState = HIGH;          // the previous reading from the input pin
 unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
 
@@ -100,10 +123,11 @@ unsigned long debounceDelay = 50;    // the debounce time; increase if the outpu
 //adc
 int analogSwitchTheme = 0;
 int analogSwitchuser = 0;
+int analogJackInserted = 0;
 
 //fastled
 #define NUM_LEDS 24
-#define BRIGHTNESS  20
+#define BRIGHTNESS 20
 #define DATA_PIN 40
 #define DATA_PIN2 38
 #define CLOCK_PIN 13  //not use
@@ -124,15 +148,15 @@ int intNombreDossier = 5;
 
 
 //time NTP RTC
-const char* ntpServer = "pool.ntp.org";
-const long  gmtOffset_sec = 3600;
-const int   daylightOffset_sec = 3600;
-#define DISPLAY_TIME_PERIOD  60000   //60 seconde
+const char *ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 3600;
+const int daylightOffset_sec = 3600;
+#define DISPLAY_TIME_PERIOD 60000  //60 seconde
 RTC_PCF8563 rtc;
 DateTime now;
 struct tm timeinfo;
 
-char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
 
 //wifi
@@ -148,12 +172,10 @@ void set_tick_tock(void) {
 
 
 
-void rotary_onButtonClick()
-{
+void rotary_onButtonClick() {
   static unsigned long lastTimePressed = 0;
   //ignore multiple press in that time milliseconds
-  if (millis() - lastTimePressed < 500)
-  {
+  if (millis() - lastTimePressed < 500) {
     return;
   }
   lastTimePressed = millis();
@@ -161,26 +183,20 @@ void rotary_onButtonClick()
   Serial.print(millis());
   Serial.println(" milliseconds after restart");
 
-  if (flip_light == 1)
-  {
+  if (flip_light == 1) {
     flip_light = 0;
-  }
-  else
-  {
+  } else {
     flip_light = 1;
   }
 
   ulong_time_picture = millis() + TIME_PICTURE_END;
-
 }
 
 
 
-void rotary_loop()
-{
+void rotary_loop() {
   //dont print anything unless value changed
-  if (rotaryEncoder.encoderChanged())
-  {
+  if (rotaryEncoder.encoderChanged()) {
     //Serial.print("Value: ");
     numero_led = rotaryEncoder.readEncoder();
     intNumeroDossier = (numero_led % intNombreDossier) + 1;
@@ -195,7 +211,7 @@ void rotary_loop()
     Serial.println("Led anneau");
     Serial.println(numero_led);
 
-    switch ( numero_led ) {
+    switch (numero_led) {
       case 1:
         audio.connecttoFS(SD, "/05/001.mp3");
         break;
@@ -275,16 +291,14 @@ void rotary_loop()
 
     ulong_time_picture = millis() + TIME_PICTURE_END;
   }
-  if (rotaryEncoder.isEncoderButtonClicked())
-  {
+  if (rotaryEncoder.isEncoderButtonClicked()) {
     rotary_onButtonClick();
   }
 }
 
 
 
-void IRAM_ATTR readEncoderISR()
-{
+void IRAM_ATTR readEncoderISR() {
   rotaryEncoder.readEncoder_ISR();
 }
 
@@ -318,7 +332,7 @@ void initSDCard() {
 
 
 
-void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
+void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
   Serial.printf("Listing directory: %s\n", dirname);
 
   File root = fs.open(dirname);
@@ -363,10 +377,9 @@ void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
 
   Serial.print("File number:");
   Serial.println(intNbAudioFileInDir);
-
 }
 
-void createDir(fs::FS &fs, const char * path) {
+void createDir(fs::FS &fs, const char *path) {
   Serial.printf("Creating Dir: %s\n", path);
   if (fs.mkdir(path)) {
     Serial.println("Dir created");
@@ -375,7 +388,7 @@ void createDir(fs::FS &fs, const char * path) {
   }
 }
 
-void removeDir(fs::FS &fs, const char * path) {
+void removeDir(fs::FS &fs, const char *path) {
   Serial.printf("Removing Dir: %s\n", path);
   if (fs.rmdir(path)) {
     Serial.println("Dir removed");
@@ -384,7 +397,7 @@ void removeDir(fs::FS &fs, const char * path) {
   }
 }
 
-void readFile(fs::FS &fs, const char * path) {
+void readFile(fs::FS &fs, const char *path) {
   Serial.printf("Reading file: %s\n", path);
 
   File file = fs.open(path);
@@ -400,7 +413,7 @@ void readFile(fs::FS &fs, const char * path) {
   file.close();
 }
 
-void writeFile(fs::FS &fs, const char * path, const char * message) {
+void writeFile(fs::FS &fs, const char *path, const char *message) {
   Serial.printf("Writing file: %s\n", path);
 
   File file = fs.open(path, FILE_WRITE);
@@ -416,7 +429,7 @@ void writeFile(fs::FS &fs, const char * path, const char * message) {
   file.close();
 }
 
-void appendFile(fs::FS &fs, const char * path, const char * message) {
+void appendFile(fs::FS &fs, const char *path, const char *message) {
   Serial.printf("Appending to file: %s\n", path);
 
   File file = fs.open(path, FILE_APPEND);
@@ -432,7 +445,7 @@ void appendFile(fs::FS &fs, const char * path, const char * message) {
   file.close();
 }
 
-void renameFile(fs::FS &fs, const char * path1, const char * path2) {
+void renameFile(fs::FS &fs, const char *path1, const char *path2) {
   Serial.printf("Renaming file %s to %s\n", path1, path2);
   if (fs.rename(path1, path2)) {
     Serial.println("File renamed");
@@ -441,7 +454,7 @@ void renameFile(fs::FS &fs, const char * path1, const char * path2) {
   }
 }
 
-void deleteFile(fs::FS &fs, const char * path) {
+void deleteFile(fs::FS &fs, const char *path) {
   Serial.printf("Deleting file: %s\n", path);
   if (fs.remove(path)) {
     Serial.println("File deleted");
@@ -450,7 +463,7 @@ void deleteFile(fs::FS &fs, const char * path) {
   }
 }
 
-void testFileIO(fs::FS &fs, const char * path) {
+void testFileIO(fs::FS &fs, const char *path) {
   File file = fs.open(path);
   static uint8_t buf[512];
   size_t len = 0;
@@ -502,48 +515,104 @@ void printLocalTime() {
   }
   Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
 
-  //Serial.print("Wait time ms:");
-  //updateTimeHorloge = timeinfo.tm_sec;
-  //Serial.print(updateTimeHorloge);
-  //Serial.print(" -- ");
+  // Serial.print("Wait time ms:");
+  // updateTimeHorloge = timeinfo.tm_sec;
+  // Serial.print(updateTimeHorloge);
+  // Serial.print(" -- ");
   updateTimeHorloge = millis() + (60 - timeinfo.tm_sec) * 1000;
 
-  //Serial.println(updateTimeHorloge);
+  // Serial.println(updateTimeHorloge);
 
-  //  Serial.print("Day of week: ");
-  //  Serial.println(&timeinfo, "%A");
-  //  Serial.print("Month: ");
-  //  Serial.println(&timeinfo, "%B");
-  //  Serial.print("Day of Month: ");
-  //  Serial.println(&timeinfo, "%d");
-  //  Serial.print("Year: ");
-  //  Serial.println(&timeinfo, "%Y");
-  //  Serial.print("Hour: ");
-  //  Serial.println(&timeinfo, "%H");
-  //  Serial.print("Hour (12 hour format): ");
-  //  Serial.println(&timeinfo, "%I");
-  //  Serial.print("Minute: ");
-  //  Serial.println(&timeinfo, "%M");
-  //  Serial.print("Second: ");
-  //  Serial.println(&timeinfo, "%S");
+  // Serial.print("Day of week: ");
+  // Serial.println(&timeinfo, "%A");
+  // Serial.print("Month: ");
+  // Serial.println(&timeinfo, "%B");
+  // Serial.print("Day of Month: ");
+  // Serial.println(&timeinfo, "%d");
+  // Serial.print("Year: ");
+  // Serial.println(&timeinfo, "%Y");
+  // Serial.print("Hour: ");
+  // Serial.println(&timeinfo, "%H");
+  // Serial.print("Hour (12 hour format): ");
+  // Serial.println(&timeinfo, "%I");
+  // Serial.print("Minute: ");
+  // Serial.println(&timeinfo, "%M");
+  // Serial.print("Second: ");
+  // Serial.println(&timeinfo, "%S");
 
-  //  Serial.println("Time variables");
-  //  char timeHour[3];
-  //  strftime(timeHour, 3, "%H", &timeinfo);
-  //  Serial.println(timeHour);
-  //  char timeWeekDay[10];
-  //  strftime(timeWeekDay, 10, "%A", &timeinfo);
-  //  Serial.println(timeWeekDay);
-  //  Serial.println();
-
-
+  // Serial.println("Time variables");
+  // char timeHour[3];
+  // strftime(timeHour, 3, "%H", &timeinfo);
+  // Serial.println(timeHour);
+  // char timeWeekDay[10];
+  // strftime(timeWeekDay, 10, "%A", &timeinfo);
+  // Serial.println(timeWeekDay);
+  // Serial.println();
 }
+
+
+//
+//static void usbEventCallback(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+//  if (event_base == ARDUINO_USB_EVENTS) {
+//    arduino_usb_event_data_t *data = (arduino_usb_event_data_t *)event_data;
+//    switch (event_id) {
+//      case ARDUINO_USB_STARTED_EVENT:
+//        HWSerial.println("USB PLUGGED");
+//        break;
+//      case ARDUINO_USB_STOPPED_EVENT:
+//        HWSerial.println("USB UNPLUGGED");
+//        break;
+//      case ARDUINO_USB_SUSPEND_EVENT:
+//        HWSerial.printf("USB SUSPENDED: remote_wakeup_en: %u\n", data->suspend.remote_wakeup_en);
+//        break;
+//      case ARDUINO_USB_RESUME_EVENT:
+//        HWSerial.println("USB RESUMED");
+//        break;
+//
+//      default:
+//        break;
+//    }
+//  } else if (event_base == ARDUINO_FIRMWARE_MSC_EVENTS) {
+//    arduino_firmware_msc_event_data_t *data = (arduino_firmware_msc_event_data_t *)event_data;
+//    switch (event_id) {
+//      case ARDUINO_FIRMWARE_MSC_START_EVENT:
+//        HWSerial.println("MSC Update Start");
+//        break;
+//      case ARDUINO_FIRMWARE_MSC_WRITE_EVENT:
+//        //HWSerial.printf("MSC Update Write %u bytes at offset %u\n", data->write.size, data->write.offset);
+//        HWSerial.print(".");
+//        break;
+//      case ARDUINO_FIRMWARE_MSC_END_EVENT:
+//        HWSerial.printf("\nMSC Update End: %u bytes\n", data->end.size);
+//        break;
+//      case ARDUINO_FIRMWARE_MSC_ERROR_EVENT:
+//        HWSerial.printf("MSC Update ERROR! Progress: %u bytes\n", data->error.size);
+//        break;
+//      case ARDUINO_FIRMWARE_MSC_POWER_EVENT:
+//        HWSerial.printf("MSC Update Power: power: %u, start: %u, eject: %u", data->power.power_condition, data->power.start, data->power.load_eject);
+//        break;
+//
+//      default:
+//        break;
+//    }
+//  }
+//}
 
 
 
 void setup() {
   delay(1000);
-  Serial.begin(115200);  //uart debug:2000000   uart_usb_otg:115200
+
+  //  HWSerial.begin(2000000);
+  //  HWSerial.setDebugOutput(true);
+  //
+  //  USB.onEvent(usbEventCallback);
+  //  MSC_Update.onEvent(usbEventCallback);
+  //  MSC_Update.begin();
+  //  USBSerial.begin();
+  //  USB.begin();
+  //
+  Serial.begin(2000000);  //uart debug:2000000   uart_usb_otg:115200
   while (!Serial) {
   }
   Serial.println("************************************************************");
@@ -556,18 +625,16 @@ void setup() {
 
   //I2C RTC
   Wire.begin(SDA_PIN_RTC_PCF8563, SCL_PIN_RTC_PCF8563);  //SDA SCL
-  pinMode(IRQ_PIN_RTC_PCF8563, INPUT);        // set up interrupt pin
-  digitalWrite(IRQ_PIN_RTC_PCF8563, HIGH);    // turn on pullup resistors
+  pinMode(IRQ_PIN_RTC_PCF8563, INPUT);                   // set up interrupt pin
+  digitalWrite(IRQ_PIN_RTC_PCF8563, HIGH);               // turn on pullup resistors
   // attach interrupt to set_tick_tock callback on rising edge of INT0
   attachInterrupt(digitalPinToInterrupt(IRQ_PIN_RTC_PCF8563), set_tick_tock, RISING);
 
-  if (! rtc.begin()) {
+  if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
     while (1) delay(10);
-  }
-  else
-  {
+  } else {
     Serial.println("RTC PCF8563 detect");
   }
 
@@ -627,20 +694,16 @@ void setup() {
   WiFi.begin(ssid.c_str(), password.c_str());
 
   Serial.print("WIFI connect :");
-  while (WiFi.status() != WL_CONNECTED)
-  {
+  while (WiFi.status() != WL_CONNECTED) {
     intWifiConnectRetry++;
     Serial.print(".");
-    delay(500);
+    delay(1000);
     if (intWifiConnectRetry >= 20) break;
   }
 
-  if (intWifiConnectRetry >= 20)
-  {
+  if (intWifiConnectRetry >= 20) {
     Serial.println("wifi PROBLEM not connected");
-  }
-  else
-  {
+  } else {
     Serial.println("wifi OK");
   }
   delay(1500);
@@ -677,7 +740,7 @@ void setup() {
 
   Serial.println("init neopixel");
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
-  FastLED.setBrightness( BRIGHTNESS );
+  FastLED.setBrightness(BRIGHTNESS);
 
   Serial.println("init rotary");
   pinMode(ROTARY_ENCODER_A_PIN, INPUT_PULLUP);
@@ -690,7 +753,7 @@ void setup() {
   //set boundaries and if values should cycle or not
   //in this example we will set possible values between 0 and 1000;
   bool circleValues = true;
-  rotaryEncoder.setBoundaries(0, CYCLE_ROT, circleValues); //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
+  rotaryEncoder.setBoundaries(0, CYCLE_ROT, circleValues);  //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
 
   /*Rotary acceleration introduced 25.2.2021.
      in case range to select is huge, for example - select a value between 0 and 1000 and we want 785
@@ -700,12 +763,14 @@ void setup() {
      For fine tuning slow down.
   */
   //rotaryEncoder.disableAcceleration(); //acceleration is now enabled by default - disable if you dont need it
-  rotaryEncoder.setAcceleration(1); //250 or set the value - larger number = more accelearation; 0 or 1 means disabled acceleration
+  rotaryEncoder.setAcceleration(1);  //250 or set the value - larger number = more accelearation; 0 or 1 means disabled acceleration
 
   ulong_time_picture = millis() + TIME_PICTURE_END;
 
 
   //audio web radio
+  //enable AUDIO
+  pinMode(PIN_ENABLE_I2S, INPUT); // floatting left+right/2
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
   audio.setVolume(0);
   //stream music
@@ -716,57 +781,66 @@ void setup() {
   audio.connecttoFS(SD, "/04/001.mp3");
 
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
+
+  //pullup jack detect
+  pinMode(PIN_ADC_JACK_DETECT, INPUT);
 }
 
 
 
-void loop()
-{
+void loop() {
   nowTimeMillis = millis();
   ulong_time_now = millis();
 
   //read ADC value
   //update dispay time
-  if ( millis() > updateAdcRead )
-  {
+  if (millis() > updateAdcRead) {
     updateAdcRead = millis() + PERIOD_READ_ADC;
 
     // switch theme
     analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
-    Serial.printf("Switch theme = %d\n", analogSwitchTheme);
-    analogSwitchTheme = analogReadMilliVolts(PIN_SWITCH_THEME);
-    Serial.printf("ADC millivolts value = %d\n", analogSwitchTheme);
+//    Serial.printf("Switch theme = %d\n", analogSwitchTheme);
+//    analogSwitchTheme = analogReadMilliVolts(PIN_SWITCH_THEME);
+    //Serial.printf("ADC mV theme = %d\n", analogSwitchTheme);
+    Serial.printf("%d,", analogSwitchTheme);
 
-    // user theme
+    // switch user
     analogSwitchuser = analogRead(PIN_SWITCH_USER);
-    Serial.printf("Switch theme = %d\n", analogSwitchuser);
-    analogSwitchuser = analogReadMilliVolts(PIN_SWITCH_USER);
-    Serial.printf("ADC millivolts value = %d\n", analogSwitchuser);
+//    Serial.printf("Switch user = %d\n", analogSwitchuser);
+//    analogSwitchuser = analogReadMilliVolts(PIN_SWITCH_USER);
+    //Serial.printf("ADC mV user = %d\n", analogSwitchuser);
+    Serial.printf("%d,", analogSwitchuser);
 
+    //Jack connected
+//    analogJackInserted = analogRead(PIN_ADC_JACK_DETECT);
+//    Serial.printf("ADC jack = %d\n", analogJackInserted);
+    //analogJackInserted = analogReadMilliVolts(PIN_ADC_JACK_DETECT);
+    analogJackInserted = digitalRead(PIN_ADC_JACK_DETECT);
+    //Serial.printf("ADC mV jack = %d\n", analogJackInserted);
+    Serial.printf("%d\n", analogJackInserted);
   }
 
   //update dispay time
-  if ( millis() > updateTimeHorloge )
-  {
+  if (millis() > updateTimeHorloge) {
     printLocalTime();
 
     //RTC PCF8563
     now = rtc.now();
 
-    Serial.print(now.year(), DEC);
-    Serial.print('/');
-    Serial.print(now.month(), DEC);
-    Serial.print('/');
-    Serial.print(now.day(), DEC);
-    Serial.print(" (");
-    Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
-    Serial.print(") ");
-    Serial.print(now.hour(), DEC);
-    Serial.print(':');
-    Serial.print(now.minute(), DEC);
-    Serial.print(':');
-    Serial.print(now.second(), DEC);
-    Serial.println();
+//    Serial.print(now.year(), DEC);
+//    Serial.print('/');
+//    Serial.print(now.month(), DEC);
+//    Serial.print('/');
+//    Serial.print(now.day(), DEC);
+//    Serial.print(" (");
+//    Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
+//    Serial.print(") ");
+//    Serial.print(now.hour(), DEC);
+//    Serial.print(':');
+//    Serial.print(now.minute(), DEC);
+//    Serial.print(':');
+//    Serial.print(now.second(), DEC);
+//    Serial.println();
   }
 
   //in loop call your custom function which will process rotary encoder values
@@ -794,7 +868,7 @@ void loop()
 
         if (changeGain > 2) changeGain = 0;
 
-        switch ( changeGain ) {
+        switch (changeGain) {
           case 0:
             //3db
             Serial.println("gain:15dB");  //15dB
@@ -803,13 +877,13 @@ void loop()
             break;
           case 1:
             //15db
-            Serial.println("gain:3dB"); //3dB
+            Serial.println("gain:3dB");  //3dB
             pinMode(I2S_GAIN, OUTPUT);
             digitalWrite(I2S_GAIN, HIGH);
             break;
           default:
             //12db
-            Serial.println("gain:12dB"); //12dB
+            Serial.println("gain:12dB");  //12dB
             pinMode(I2S_GAIN, INPUT);
             break;
         }
@@ -822,8 +896,7 @@ void loop()
 
 
   //refresh volume with led
-  if (nowTimeMillis > updateTimeVolume )
-  {
+  if (nowTimeMillis > updateTimeVolume) {
     updateTimeVolume = nowTimeMillis + PERIOD_READ_VOLUME;
 
     valVolume = analogRead(PIN_VOLUME);
@@ -832,66 +905,50 @@ void loop()
     if (valVolume >= 21) valVolume = 21;
     if (valVolume <= 0) valVolume = 0;
 
-    if ( (valVolume - valVolumeold) > 1) updatevolume = 1;
-    if ( (valVolumeold - valVolume) > 1) updatevolume = 1;
+    if ((valVolume - valVolumeold) > 1) updatevolume = 1;
+    if ((valVolumeold - valVolume) > 1) updatevolume = 1;
 
-    if (updatevolume == 1)
-    {
+    if (updatevolume == 1) {
       Serial.print(valVolume);
       Serial.print(",");
       Serial.println(updatevolume);
       updatevolume = 0;
       valVolumeold = valVolume;
-      audio.setVolume(valVolume); // 0...21
+      audio.setVolume(valVolume);  // 0...21
 
-      for (i = 0; i < NUM_LEDS; i++)
-      {
+      for (i = 0; i < NUM_LEDS; i++) {
         leds[i] = CRGB::Black;
       }
 
-      for (i = 0; i < map(valVolume, 0, 21, 0, NUM_LEDS); i++)
-      {
+      for (i = 0; i < map(valVolume, 0, 21, 0, NUM_LEDS); i++) {
         couleur = CRGB(200, 0, 0);
         leds[i] = couleur;
       }
       FastLED.show();
 
-    }
-    else
-    {
+    } else {
       //Serial.println(updatevolume);
       //init all led with OFF or ON
-      for (i = 0; i < NUM_LEDS; i++)
-      {
-        if (flip_light == 1)
-        {
+      for (i = 0; i < NUM_LEDS; i++) {
+        if (flip_light == 1) {
           leds[i] = CRGB::White;
-        }
-        else
-        {
+        } else {
           leds[i] = CRGB::Black;
         }
       }
 
-      if (ulong_time_now >= ulong_time_picture)
-      {
-        if (flip_light == 1)
-        {
+      if (ulong_time_now >= ulong_time_picture) {
+        if (flip_light == 1) {
           leds[numero_led] = CRGB::White;
-        }
-        else
-        {
+        } else {
           leds[numero_led] = CRGB::Black;
         }
-      }
-      else
-      {
+      } else {
         leds[numero_led] = CRGB::Red;
       }
 
       FastLED.show();
     }
-
   }
 
   audio.loop();
