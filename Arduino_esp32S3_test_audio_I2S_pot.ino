@@ -94,6 +94,8 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 #define PERIOD_READ_VOLUME 50    //ms
 #define PERIOD_CHANGE_GAIN 5000  //ms updateTimeGain
 #define PERIOD_READ_ADC 1000     //ms updateTimeGain
+#define PERIOD_JACK_DECTECT 50   //ms read stats jack
+#define COUNTER_MAX_JACK  20
 Audio audio;
 
 String ssid = "*****************";
@@ -102,12 +104,15 @@ String password = "**********************";
 long int valVolume = 0;
 long int valVolumeold = 0;
 int updatevolume = 0;
+int jackInserted = 0;     //status jack audio
+int jackInsertedCnt = 0;  //counter jack status
 
 unsigned long nowTimeMillis = 0;
 unsigned long updateTimeVolume = 0;
 unsigned long updateTimeGain = 0;
 unsigned long updateTimeHorloge = 0;
 unsigned long updateAdcRead = 0;
+unsigned long CheckTimeJackInserted = 0;
 
 int i = 0;  //for
 
@@ -697,8 +702,8 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     intWifiConnectRetry++;
     Serial.print(".");
-    delay(1000);
-    if (intWifiConnectRetry >= 20) break;
+    delay(100);
+    if (intWifiConnectRetry >= 200) break;
   }
 
   if (intWifiConnectRetry >= 20) {
@@ -770,7 +775,7 @@ void setup() {
 
   //audio web radio
   //enable AUDIO
-  pinMode(PIN_ENABLE_I2S, INPUT); // floatting left+right/2
+  pinMode(PIN_ENABLE_I2S, INPUT);  // floatting left+right/2
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
   audio.setVolume(0);
   //stream music
@@ -792,6 +797,25 @@ void loop() {
   nowTimeMillis = millis();
   ulong_time_now = millis();
 
+  //check jack status
+  if (millis() > CheckTimeJackInserted) {
+    CheckTimeJackInserted = millis() + PERIOD_JACK_DECTECT;
+    analogJackInserted = digitalRead(PIN_ADC_JACK_DETECT);
+    if (analogJackInserted == 0) {
+      jackInsertedCnt++;
+      if (jackInsertedCnt >= COUNTER_MAX_JACK) jackInsertedCnt = COUNTER_MAX_JACK;
+    } else {
+      jackInsertedCnt--;
+      if (jackInsertedCnt <= 0) jackInsertedCnt = 0;
+    }
+
+    if (jackInsertedCnt <= 0) {
+      jackInserted = 0;
+    } else {
+      jackInserted = 1;
+    }
+  }
+
   //read ADC value
   //update dispay time
   if (millis() > updateAdcRead) {
@@ -799,25 +823,27 @@ void loop() {
 
     // switch theme
     analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
-//    Serial.printf("Switch theme = %d\n", analogSwitchTheme);
-//    analogSwitchTheme = analogReadMilliVolts(PIN_SWITCH_THEME);
+    //    Serial.printf("Switch theme = %d\n", analogSwitchTheme);
+    //    analogSwitchTheme = analogReadMilliVolts(PIN_SWITCH_THEME);
     //Serial.printf("ADC mV theme = %d\n", analogSwitchTheme);
     Serial.printf("%d,", analogSwitchTheme);
 
     // switch user
     analogSwitchuser = analogRead(PIN_SWITCH_USER);
-//    Serial.printf("Switch user = %d\n", analogSwitchuser);
-//    analogSwitchuser = analogReadMilliVolts(PIN_SWITCH_USER);
+    //    Serial.printf("Switch user = %d\n", analogSwitchuser);
+    //    analogSwitchuser = analogReadMilliVolts(PIN_SWITCH_USER);
     //Serial.printf("ADC mV user = %d\n", analogSwitchuser);
     Serial.printf("%d,", analogSwitchuser);
 
     //Jack connected
-//    analogJackInserted = analogRead(PIN_ADC_JACK_DETECT);
-//    Serial.printf("ADC jack = %d\n", analogJackInserted);
+    //    analogJackInserted = analogRead(PIN_ADC_JACK_DETECT);
+    //    Serial.printf("ADC jack = %d\n", analogJackInserted);
     //analogJackInserted = analogReadMilliVolts(PIN_ADC_JACK_DETECT);
-    analogJackInserted = digitalRead(PIN_ADC_JACK_DETECT);
+    //analogJackInserted = digitalRead(PIN_ADC_JACK_DETECT);
     //Serial.printf("ADC mV jack = %d\n", analogJackInserted);
-    Serial.printf("%d\n", analogJackInserted);
+    //Serial.printf("%d\n", analogJackInserted);
+    Serial.printf("%d,%d\n", jackInsertedCnt, jackInserted);
+
   }
 
   //update dispay time
@@ -827,20 +853,20 @@ void loop() {
     //RTC PCF8563
     now = rtc.now();
 
-//    Serial.print(now.year(), DEC);
-//    Serial.print('/');
-//    Serial.print(now.month(), DEC);
-//    Serial.print('/');
-//    Serial.print(now.day(), DEC);
-//    Serial.print(" (");
-//    Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
-//    Serial.print(") ");
-//    Serial.print(now.hour(), DEC);
-//    Serial.print(':');
-//    Serial.print(now.minute(), DEC);
-//    Serial.print(':');
-//    Serial.print(now.second(), DEC);
-//    Serial.println();
+    //    Serial.print(now.year(), DEC);
+    //    Serial.print('/');
+    //    Serial.print(now.month(), DEC);
+    //    Serial.print('/');
+    //    Serial.print(now.day(), DEC);
+    //    Serial.print(" (");
+    //    Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
+    //    Serial.print(") ");
+    //    Serial.print(now.hour(), DEC);
+    //    Serial.print(':');
+    //    Serial.print(now.minute(), DEC);
+    //    Serial.print(':');
+    //    Serial.print(now.second(), DEC);
+    //    Serial.println();
   }
 
   //in loop call your custom function which will process rotary encoder values
@@ -920,7 +946,7 @@ void loop() {
         leds[i] = CRGB::Black;
       }
 
-      for (i = 0; i < map(valVolume, 0, 21, 0, NUM_LEDS); i++) {
+      for (i = 0; i < map(valVolume, 0, 21, 0, 12); i++) {
         couleur = CRGB(200, 0, 0);
         leds[i] = couleur;
       }
