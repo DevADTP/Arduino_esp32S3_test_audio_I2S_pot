@@ -65,6 +65,7 @@
 
 //button PLAY (used as gain audio)
 #define PIN_BUTTON_PLAY 18
+#define PIN_BUTTON_NEXT 18
 
 //use for turn off red light indicator after 10s
 #define TIME_PICTURE_END 10000  //milliseconds (10s)
@@ -74,7 +75,7 @@
 #define ROTARY_ENCODER_BUTTON_PIN 7
 #define ROTARY_ENCODER_VCC_PIN 17
 #define ROTARY_ENCODER_STEPS 4
-#define CYCLE_ROT 24
+#define CYCLE_ROT 9  //24 ref bourns PEC11R-4015F-S0024 (RS:737-7739)
 
 //instead of changing here, rather change numbers above
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
@@ -95,7 +96,7 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 #define PERIOD_CHANGE_GAIN 5000  //ms updateTimeGain
 #define PERIOD_READ_ADC 1000     //ms updateTimeGain
 #define PERIOD_JACK_DECTECT 50   //ms read stats jack
-#define COUNTER_MAX_JACK  20
+#define COUNTER_MAX_JACK 20
 Audio audio;
 
 String ssid = "*****************";
@@ -120,10 +121,14 @@ int changeGain = 0;
 
 int readButPlay = 0;
 int buttonState;                     // the current reading from the input pin
+int buttonStateLongPress;            // the current reading from the input pin
 int lastButtonState = HIGH;          // the previous reading from the input pin
 unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
 
+unsigned long longPressButton = 1500;  // long time pressure button
+
+int nextSong = 0;
 
 //adc
 int analogSwitchTheme = 0;
@@ -147,9 +152,12 @@ int flip_light = 0;
 unsigned long ulong_time_now = 0;
 unsigned long ulong_time_picture = 0;  //TIME_PICTURE_END
 
+//files
 int intNbAudioFileInDir = 0;
-int intNumeroDossier = 1;
-int intNombreDossier = 5;
+int intNumeroDossier = 5;
+int intNombreDossier = 6;
+
+char name_directory[100] = "/05";
 
 
 //time NTP RTC
@@ -169,6 +177,10 @@ int intWifiConnectRetry = 0;
 
 // flag to update serial; set in interrupt callback
 volatile uint8_t tick_tock = 1;
+
+
+//fonction declaration
+void change_song(void);
 
 // INT0 interrupt callback; update tick_tock flag
 void set_tick_tock(void) {
@@ -206,91 +218,39 @@ void rotary_loop() {
     numero_led = rotaryEncoder.readEncoder();
     intNumeroDossier = (numero_led % intNombreDossier) + 1;
 
+    Serial.print("Dossier THEME:");
+    Serial.println(intNumeroDossier);
+
+    // Serial.print("Led anneau : ");
+    // Serial.println(numero_led);
+
+    sprintf(name_directory, "/%02d", intNumeroDossier);
     intNbAudioFileInDir = 0;
-    listDir(SD, "/05", 1);
+    //listDir(SD, "/05", 1);
+    listDir(SD, name_directory, 1);
 
-    Serial.print("Dossier:");
-    Serial.print("intNumeroDossier");
-    Serial.println(numero_led);
 
-    Serial.println("Led anneau");
-    Serial.println(numero_led);
-
-    switch (numero_led) {
+    switch (intNumeroDossier) {
       case 1:
-        audio.connecttoFS(SD, "/05/001.mp3");
+        audio.connecttoSD("/01/001.mp3");
         break;
       case 2:
-        audio.connecttoFS(SD, "/05/002.mp3");
+        audio.connecttoSD("/02/001.mp3");
         break;
       case 3:
-        audio.connecttoFS(SD, "/05/003.mp3");
+        audio.connecttoSD("/03/001.mp3");
         break;
       case 4:
-        audio.connecttoFS(SD, "/05/004.mp3");
+        audio.connecttoSD("/04/001.mp3");
         break;
       case 5:
-        audio.connecttoFS(SD, "/05/005.mp3");
+        audio.connecttoSD("/05/001.mp3");
         break;
       case 6:
-        audio.connecttoFS(SD, "/05/006.mp3");
-        break;
-      case 7:
-        audio.connecttoFS(SD, "/05/007.mp3");
-        break;
-      case 8:
-        audio.connecttoFS(SD, "/05/008.mp3");
-        break;
-      case 9:
-        audio.connecttoFS(SD, "/01/001.mp3");
-        break;
-      case 10:
-        audio.connecttoFS(SD, "/01/002.mp3");
-        break;
-      case 11:
-        audio.connecttoFS(SD, "/02/001.mp3");
-        break;
-      case 12:
-        audio.connecttoFS(SD, "/02/002.mp3");
-        break;
-      case 13:
-        audio.connecttoFS(SD, "/02/003.mp3");
-        break;
-      case 14:
-        audio.connecttoFS(SD, "/02/004.mp3");
-        break;
-      case 15:
-        audio.connecttoFS(SD, "/02/005.mp3");
-        break;
-      case 16:
-        audio.connecttoFS(SD, "/03/001.mp3");
-        break;
-      case 17:
-        audio.connecttoFS(SD, "/03/001.mp3");
-        break;
-      case 18:
-        audio.connecttoFS(SD, "/03/002.mp3");
-        break;
-      case 19:
-        audio.connecttoFS(SD, "/03/003.mp3");
-        break;
-      case 20:
-        audio.connecttoFS(SD, "/03/004.mp3");
-        break;
-      case 21:
-        audio.connecttoFS(SD, "/04/001.mp3");
-        break;
-      case 22:
-        audio.connecttoFS(SD, "/04/002.mp3");
-        break;
-      case 23:
-        audio.connecttoFS(SD, "/06/001.mp3");
-        break;
-      case 24:
-        audio.connecttoFS(SD, "/06/002.mp3");
+        audio.connecttoSD("/06/001.mp3");
         break;
       default:
-        audio.connecttoFS(SD, "/04/001.mp3");
+        audio.connecttoSD("/05/001.mp3");
         break;
     }
 
@@ -772,18 +732,24 @@ void setup() {
 
   ulong_time_picture = millis() + TIME_PICTURE_END;
 
+  //gain audio
+  Serial.println("gain:3dB");  //3dB
+  pinMode(I2S_GAIN, OUTPUT);
+  digitalWrite(I2S_GAIN, HIGH);
 
   //audio web radio
   //enable AUDIO
   pinMode(PIN_ENABLE_I2S, INPUT);  // floatting left+right/2
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+  audio.setBalance(-16);  // mutes the left channel
   audio.setVolume(0);
   //stream music
   //audio.connecttohost("http://vis.media-ice.musicradio.com/CapitalMP3");
 
   //sd musique
   //audio.connecttoFS(SD, "/01/001.mp3");
-  audio.connecttoFS(SD, "/04/001.mp3");
+  //audio.connecttoFS(SD, "/04/001.mp3");
+  audio.connecttoSD("/04/001.mp3");
 
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
 
@@ -843,7 +809,6 @@ void loop() {
     //Serial.printf("ADC mV jack = %d\n", analogJackInserted);
     //Serial.printf("%d\n", analogJackInserted);
     Serial.printf("%d,%d\n", jackInsertedCnt, jackInserted);
-
   }
 
   //update dispay time
@@ -853,20 +818,20 @@ void loop() {
     //RTC PCF8563
     now = rtc.now();
 
-    //    Serial.print(now.year(), DEC);
-    //    Serial.print('/');
-    //    Serial.print(now.month(), DEC);
-    //    Serial.print('/');
-    //    Serial.print(now.day(), DEC);
-    //    Serial.print(" (");
-    //    Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
-    //    Serial.print(") ");
-    //    Serial.print(now.hour(), DEC);
-    //    Serial.print(':');
-    //    Serial.print(now.minute(), DEC);
-    //    Serial.print(':');
-    //    Serial.print(now.second(), DEC);
-    //    Serial.println();
+    Serial.print(now.year(), DEC);
+    Serial.print('/');
+    Serial.print(now.month(), DEC);
+    Serial.print('/');
+    Serial.print(now.day(), DEC);
+    Serial.print(" (");
+    Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
+    Serial.print(") ");
+    Serial.print(now.hour(), DEC);
+    Serial.print(':');
+    Serial.print(now.minute(), DEC);
+    Serial.print(':');
+    Serial.print(now.second(), DEC);
+    Serial.println();
   }
 
   //in loop call your custom function which will process rotary encoder values
@@ -880,6 +845,19 @@ void loop() {
     lastDebounceTime = millis();
   }
 
+
+  if ((millis() - lastDebounceTime) > longPressButton) {
+
+    if (readButPlay != buttonStateLongPress) {
+      buttonStateLongPress = readButPlay;
+
+      //test pause/play
+      Serial.println("Long press PLAY/PAUSE");  //15dB
+      audio.pauseResume();
+    }
+  }
+
+
   if ((millis() - lastDebounceTime) > debounceDelay) {
     // whatever the readButPlay is at, it's been there for longer than the debounce
     // delay, so take it as the actual current state:
@@ -888,30 +866,41 @@ void loop() {
     if (readButPlay != buttonState) {
       buttonState = readButPlay;
 
-      // only toggle the LED if the new button state is HIGH
-      if (buttonState == HIGH) {
-        changeGain++;
+      //detect long press no effect
+      if (!((millis() - lastDebounceTime) > longPressButton)) {
+        // only toggle the LED if the new button state is HIGH
+        if (buttonState == HIGH) {
 
-        if (changeGain > 2) changeGain = 0;
+          //test gain
+          if (false) {
+            changeGain++;
+            if (changeGain > 2) changeGain = 0;
 
-        switch (changeGain) {
-          case 0:
-            //3db
-            Serial.println("gain:15dB");  //15dB
-            pinMode(I2S_GAIN, OUTPUT);
-            digitalWrite(I2S_GAIN, LOW);
-            break;
-          case 1:
-            //15db
-            Serial.println("gain:3dB");  //3dB
-            pinMode(I2S_GAIN, OUTPUT);
-            digitalWrite(I2S_GAIN, HIGH);
-            break;
-          default:
-            //12db
-            Serial.println("gain:12dB");  //12dB
-            pinMode(I2S_GAIN, INPUT);
-            break;
+            switch (changeGain) {
+              case 0:
+                //3db
+                Serial.println("gain:15dB");  //15dB
+                pinMode(I2S_GAIN, OUTPUT);
+                digitalWrite(I2S_GAIN, LOW);
+                break;
+              case 1:
+                //15db
+                Serial.println("gain:3dB");  //3dB
+                pinMode(I2S_GAIN, OUTPUT);
+                digitalWrite(I2S_GAIN, HIGH);
+                break;
+              default:
+                //12db
+                Serial.println("gain:12dB");  //12dB
+                pinMode(I2S_GAIN, INPUT);
+                break;
+            }
+          }
+          // end test gain
+
+          nextSong++;
+          Serial.println("Next Song click");  
+          change_song();
         }
       }
     }
@@ -978,4 +967,74 @@ void loop() {
   }
 
   audio.loop();
+}
+
+
+//allow liste automatique quand fin de musique
+void audio_eof_mp3(const char *info) {  //end of file
+  Serial.print("audio_info: ");
+  Serial.println(info);
+
+  nextSong++;
+  Serial.println("Next Song autoloop");  
+  change_song();
+}
+
+
+
+void change_song(void) {
+  switch (intNumeroDossier) {
+    case 1:
+      if (nextSong > 1) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/01/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/01/002.mp3");
+      break;
+    case 2:
+      if (nextSong > 4) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/02/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/02/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/02/003.mp3");
+      if (nextSong == 3) audio.connecttoSD("/02/004.mp3");
+      if (nextSong == 4) audio.connecttoSD("/02/005.mp3");
+      break;
+    case 3:
+      if (nextSong > 3) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/03/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/03/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/03/003.mp3");
+      if (nextSong == 3) audio.connecttoSD("/03/004.mp3");
+      break;
+    case 4:
+      if (nextSong > 1) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/04/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/04/002.mp3");
+      break;
+    case 5:
+      if (nextSong > 7) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/05/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/05/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/05/003.mp3");
+      if (nextSong == 3) audio.connecttoSD("/05/004.mp3");
+      if (nextSong == 4) audio.connecttoSD("/05/005.mp3");
+      if (nextSong == 5) audio.connecttoSD("/05/006.mp3");
+      if (nextSong == 6) audio.connecttoSD("/05/007.mp3");
+      if (nextSong == 7) audio.connecttoSD("/05/008.mp3");
+      break;
+    case 6:
+      if (nextSong > 2) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/06/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/06/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/06/003.mp3");
+      break;
+    default:
+      if (nextSong == 0) audio.connecttoSD("/05/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/05/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/05/003.mp3");
+      if (nextSong == 3) audio.connecttoSD("/05/004.mp3");
+      if (nextSong == 4) audio.connecttoSD("/05/005.mp3");
+      if (nextSong == 5) audio.connecttoSD("/05/006.mp3");
+      if (nextSong == 6) audio.connecttoSD("/05/007.mp3");
+      if (nextSong == 7) audio.connecttoSD("/05/008.mp3");
+      break;
+  }
 }
