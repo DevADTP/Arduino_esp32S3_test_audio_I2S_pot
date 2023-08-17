@@ -95,9 +95,13 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 #define PERIOD_READ_VOLUME 50    //ms
 #define PERIOD_CHANGE_GAIN 5000  //ms updateTimeGain
 #define PERIOD_READ_ADC 1000     //ms updateTimeGain
-#define PERIOD_JACK_DECTECT 50   //ms read stats jack
+#define PERIOD_JACK_DETECT 500   //ms read stats jack
 #define COUNTER_MAX_JACK 20
 Audio audio;
+
+//PERIOD DEFINE
+#define PERIOD_LOG_UART 1000  //ms updateTimeGain
+
 
 String ssid = "*****************";
 String password = "**********************";
@@ -105,14 +109,15 @@ String password = "**********************";
 long int valVolume = 0;
 long int valVolumeold = 0;
 int updatevolume = 0;
-int jackInserted = 0;     //status jack audio
-int jackInsertedCnt = 0;  //counter jack status
+int jackInserted = 0;              //status jack audio
+volatile int jackInsertedCnt = 0;  //counter jack status
 
 unsigned long nowTimeMillis = 0;
 unsigned long updateTimeVolume = 0;
 unsigned long updateTimeGain = 0;
 unsigned long updateTimeHorloge = 0;
 unsigned long updateAdcRead = 0;
+unsigned long updateLogUart = 0;
 unsigned long CheckTimeJackInserted = 0;
 
 int i = 0;  //for
@@ -162,9 +167,9 @@ char name_directory[100] = "/05";
 
 //time NTP RTC
 const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 3600;
-const int daylightOffset_sec = 3600;
-#define DISPLAY_TIME_PERIOD 60000  //60 seconde
+const long gmtOffset_sec = 3600 * 1;
+const int daylightOffset_sec = 3600 * 1;
+#define DISPLAY_TIME_PERIOD 60000  //60 seconde on uart
 RTC_PCF8563 rtc;
 DateTime now;
 struct tm timeinfo;
@@ -179,8 +184,13 @@ int intWifiConnectRetry = 0;
 volatile uint8_t tick_tock = 1;
 
 
+
 //fonction declaration
 void change_song(void);
+void logUart(void);
+
+
+
 
 // INT0 interrupt callback; update tick_tock flag
 void set_tick_tock(void) {
@@ -513,6 +523,25 @@ void printLocalTime() {
   // strftime(timeWeekDay, 10, "%A", &timeinfo);
   // Serial.println(timeWeekDay);
   // Serial.println();
+
+
+  //RTC PCF8563
+  now = rtc.now();
+
+  Serial.print(now.year(), DEC);
+  Serial.print('/');
+  Serial.print(now.month(), DEC);
+  Serial.print('/');
+  Serial.print(now.day(), DEC);
+  Serial.print(" (");
+  Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
+  Serial.print(") ");
+  Serial.print(now.hour(), DEC);
+  Serial.print(':');
+  Serial.print(now.minute(), DEC);
+  Serial.print(':');
+  Serial.print(now.second(), DEC);
+  Serial.println();
 }
 
 
@@ -563,6 +592,13 @@ void printLocalTime() {
 //  }
 //}
 
+
+void jackChangeInterrupt() {
+  jackInsertedCnt++;
+  jackInserted = 0;
+  CheckTimeJackInserted = millis() + PERIOD_JACK_DETECT;
+  detachInterrupt(digitalPinToInterrupt(PIN_ADC_JACK_DETECT));
+}
 
 
 void setup() {
@@ -650,6 +686,8 @@ void setup() {
   Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
   Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
 
+  //memoire PSRAM
+  Serial.println((String) "Memoire disponible dans la PSRAM : " + ESP.getFreePsram());
 
   //wifi
   WiFi.disconnect();
@@ -688,9 +726,9 @@ void setup() {
   // January 21, 2014 at 3am you would call:
   // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   Serial.print("Extract time : ");
-  Serial.print(timeinfo.tm_year);
+  Serial.print((timeinfo.tm_year + 1900));
   Serial.print("_");
-  Serial.print(timeinfo.tm_mon);
+  Serial.print(timeinfo.tm_mon + 1);
   Serial.print("_");
   Serial.print(timeinfo.tm_mday);
   Serial.print("_");
@@ -700,7 +738,7 @@ void setup() {
   Serial.print("_");
   Serial.println(timeinfo.tm_sec);
 
-  rtc.adjust(DateTime(timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+  rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
   rtc.start();
 
   Serial.println("init neopixel");
@@ -743,18 +781,26 @@ void setup() {
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
   audio.setBalance(-16);  // mutes the left channel
   audio.setVolume(0);
+  audio.forceMono(true);  //mono application
+
   //stream music
   //audio.connecttohost("http://vis.media-ice.musicradio.com/CapitalMP3");
 
   //sd musique
-  //audio.connecttoFS(SD, "/01/001.mp3");
   //audio.connecttoFS(SD, "/04/001.mp3");
   audio.connecttoSD("/04/001.mp3");
+  audio.pauseResume();
 
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
 
   //pullup jack detect
-  pinMode(PIN_ADC_JACK_DETECT, INPUT);
+  pinMode(PIN_ADC_JACK_DETECT, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PIN_ADC_JACK_DETECT), jackChangeInterrupt, CHANGE);
+
+
+  //turn off wifi
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
 }
 
 
@@ -763,27 +809,14 @@ void loop() {
   nowTimeMillis = millis();
   ulong_time_now = millis();
 
-  //check jack status
+  //check jack status digital pin not analog
   if (millis() > CheckTimeJackInserted) {
-    CheckTimeJackInserted = millis() + PERIOD_JACK_DECTECT;
-    analogJackInserted = digitalRead(PIN_ADC_JACK_DETECT);
-    if (analogJackInserted == 0) {
-      jackInsertedCnt++;
-      if (jackInsertedCnt >= COUNTER_MAX_JACK) jackInsertedCnt = COUNTER_MAX_JACK;
-    } else {
-      jackInsertedCnt--;
-      if (jackInsertedCnt <= 0) jackInsertedCnt = 0;
-    }
-
-    if (jackInsertedCnt <= 0) {
-      jackInserted = 0;
-    } else {
-      jackInserted = 1;
-    }
+    jackInserted = 1;
+    jackInsertedCnt = 0;
+    attachInterrupt(digitalPinToInterrupt(PIN_ADC_JACK_DETECT), jackChangeInterrupt, CHANGE);
   }
 
-  //read ADC value
-  //update dispay time
+  //read ADC value switch rotary 5 positions ADC
   if (millis() > updateAdcRead) {
     updateAdcRead = millis() + PERIOD_READ_ADC;
 
@@ -792,14 +825,14 @@ void loop() {
     //    Serial.printf("Switch theme = %d\n", analogSwitchTheme);
     //    analogSwitchTheme = analogReadMilliVolts(PIN_SWITCH_THEME);
     //Serial.printf("ADC mV theme = %d\n", analogSwitchTheme);
-    Serial.printf("%d,", analogSwitchTheme);
+    //Serial.printf("%d,", analogSwitchTheme);
 
     // switch user
     analogSwitchuser = analogRead(PIN_SWITCH_USER);
     //    Serial.printf("Switch user = %d\n", analogSwitchuser);
     //    analogSwitchuser = analogReadMilliVolts(PIN_SWITCH_USER);
     //Serial.printf("ADC mV user = %d\n", analogSwitchuser);
-    Serial.printf("%d,", analogSwitchuser);
+    //Serial.printf("%d,", analogSwitchuser);
 
     //Jack connected
     //    analogJackInserted = analogRead(PIN_ADC_JACK_DETECT);
@@ -808,30 +841,16 @@ void loop() {
     //analogJackInserted = digitalRead(PIN_ADC_JACK_DETECT);
     //Serial.printf("ADC mV jack = %d\n", analogJackInserted);
     //Serial.printf("%d\n", analogJackInserted);
-    Serial.printf("%d,%d\n", jackInsertedCnt, jackInserted);
+    //Serial.printf("%d,%d\n", jackInsertedCnt, jackInserted);
   }
+
+
+  //log data
+  logUart();
 
   //update dispay time
   if (millis() > updateTimeHorloge) {
     printLocalTime();
-
-    //RTC PCF8563
-    now = rtc.now();
-
-    Serial.print(now.year(), DEC);
-    Serial.print('/');
-    Serial.print(now.month(), DEC);
-    Serial.print('/');
-    Serial.print(now.day(), DEC);
-    Serial.print(" (");
-    Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
-    Serial.print(") ");
-    Serial.print(now.hour(), DEC);
-    Serial.print(':');
-    Serial.print(now.minute(), DEC);
-    Serial.print(':');
-    Serial.print(now.second(), DEC);
-    Serial.println();
   }
 
   //in loop call your custom function which will process rotary encoder values
@@ -899,7 +918,7 @@ void loop() {
           // end test gain
 
           nextSong++;
-          Serial.println("Next Song click");  
+          Serial.println("Next Song click");
           change_song();
         }
       }
@@ -976,7 +995,7 @@ void audio_eof_mp3(const char *info) {  //end of file
   Serial.println(info);
 
   nextSong++;
-  Serial.println("Next Song autoloop");  
+  Serial.println("Next Song autoloop");
   change_song();
 }
 
@@ -1036,5 +1055,18 @@ void change_song(void) {
       if (nextSong == 6) audio.connecttoSD("/05/007.mp3");
       if (nextSong == 7) audio.connecttoSD("/05/008.mp3");
       break;
+  }
+}
+
+
+void logUart(void) {
+  if (millis() > updateLogUart) {
+    updateLogUart = millis() + PERIOD_LOG_UART;
+
+    Serial.printf("%d,", analogSwitchTheme);
+    Serial.printf("%d,", analogSwitchuser);
+    Serial.printf("%d,%d,", jackInsertedCnt, jackInserted);
+    Serial.print(ESP.getFreePsram());
+    Serial.printf("\n");
   }
 }
