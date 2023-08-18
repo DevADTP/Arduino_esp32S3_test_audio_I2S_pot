@@ -159,10 +159,10 @@ unsigned long ulong_time_picture = 0;  //TIME_PICTURE_END
 
 //files
 int intNbAudioFileInDir = 0;
-int intNumeroDossier = 5;
-int intNombreDossier = 6;
+int intNumeroDossier = 9;
+int intNombreDossier = 9;
 
-char name_directory[100] = "/05";
+char name_directory[100] = "/09";
 
 
 //time NTP RTC
@@ -242,25 +242,34 @@ void rotary_loop() {
 
     switch (intNumeroDossier) {
       case 1:
-        audio.connecttoSD("/01/001.mp3");
+        audio.connecttoSD("/01/000.mp3");
         break;
       case 2:
-        audio.connecttoSD("/02/001.mp3");
+        audio.connecttoSD("/02/000.mp3");
         break;
       case 3:
-        audio.connecttoSD("/03/001.mp3");
+        audio.connecttoSD("/03/000.mp3");
         break;
       case 4:
-        audio.connecttoSD("/04/001.mp3");
+        audio.connecttoSD("/04/000.mp3");
         break;
       case 5:
-        audio.connecttoSD("/05/001.mp3");
+        audio.connecttoSD("/05/000.mp3");
         break;
       case 6:
-        audio.connecttoSD("/06/001.mp3");
+        audio.connecttoSD("/06/000.mp3");
+        break;
+      case 7:
+        audio.connecttoSD("/07/000.mp3");
+        break;
+      case 8:
+        audio.connecttoSD("/08/000.mp3");
+        break;
+      case 9:
+        audio.connecttoSD("/09/000.mp3");
         break;
       default:
-        audio.connecttoSD("/05/001.mp3");
+        audio.connecttoSD("/05/000.mp3");
         break;
     }
 
@@ -1004,56 +1013,79 @@ void audio_eof_mp3(const char *info) {  //end of file
 void change_song(void) {
   switch (intNumeroDossier) {
     case 1:
-      if (nextSong > 1) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/01/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/01/002.mp3");
+      if (nextSong > 2) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/01/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/01/001.mp3");
+      if (nextSong == 2) audio.connecttoSD("/01/002.mp3");
       break;
     case 2:
-      if (nextSong > 4) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/02/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/02/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/02/003.mp3");
-      if (nextSong == 3) audio.connecttoSD("/02/004.mp3");
-      if (nextSong == 4) audio.connecttoSD("/02/005.mp3");
+      if (nextSong > 5) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/02/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/02/001.mp3");
+      if (nextSong == 2) audio.connecttoSD("/02/002.mp3");
+      if (nextSong == 3) audio.connecttoSD("/02/003.mp3");
+      if (nextSong == 4) audio.connecttoSD("/02/004.mp3");
+      if (nextSong == 5) audio.connecttoSD("/02/005.mp3");
       break;
     case 3:
-      if (nextSong > 3) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/03/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/03/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/03/003.mp3");
-      if (nextSong == 3) audio.connecttoSD("/03/004.mp3");
+      if (nextSong > 4) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/03/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/03/001.mp3");
+      if (nextSong == 2) audio.connecttoSD("/03/002.mp3");
+      if (nextSong == 3) audio.connecttoSD("/03/003.mp3");
+      if (nextSong == 4) audio.connecttoSD("/03/004.mp3");
       break;
     case 4:
-      if (nextSong > 1) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/04/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/04/002.mp3");
+      if (nextSong > 2) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/04/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/04/001.mp3");
+      if (nextSong == 2) audio.connecttoSD("/04/002.mp3");
       break;
     case 5:
-      if (nextSong > 7) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/05/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/05/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/05/003.mp3");
-      if (nextSong == 3) audio.connecttoSD("/05/004.mp3");
-      if (nextSong == 4) audio.connecttoSD("/05/005.mp3");
-      if (nextSong == 5) audio.connecttoSD("/05/006.mp3");
-      if (nextSong == 6) audio.connecttoSD("/05/007.mp3");
-      if (nextSong == 7) audio.connecttoSD("/05/008.mp3");
+      if (nextSong > 1) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/05/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/05/001.mp3");
       break;
     case 6:
-      if (nextSong > 2) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/06/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/06/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/06/003.mp3");
+      if (nextSong > 3) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/06/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/06/001.mp3");
+      if (nextSong == 2) audio.connecttoSD("/06/002.mp3");
+      if (nextSong == 3) audio.connecttoSD("/06/003.mp3");
+      break;
+    case 7:
+      if (nextSong > 1) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/07/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/07/001.mp3");
+      break;
+    case 8:
+      if (nextSong > 1) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/08/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/08/001.mp3");
+      break;
+    case 9:
+      if (nextSong > 8) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/09/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/09/001.mp3");
+      if (nextSong == 2) audio.connecttoSD("/09/002.mp3");
+      if (nextSong == 3) audio.connecttoSD("/09/003.mp3");
+      if (nextSong == 4) audio.connecttoSD("/09/004.mp3");
+      if (nextSong == 5) audio.connecttoSD("/09/005.mp3");
+      if (nextSong == 6) audio.connecttoSD("/09/006.mp3");
+      if (nextSong == 7) audio.connecttoSD("/09/007.mp3");
+      if (nextSong == 8) audio.connecttoSD("/09/008.mp3");
       break;
     default:
-      if (nextSong == 0) audio.connecttoSD("/05/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/05/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/05/003.mp3");
-      if (nextSong == 3) audio.connecttoSD("/05/004.mp3");
-      if (nextSong == 4) audio.connecttoSD("/05/005.mp3");
-      if (nextSong == 5) audio.connecttoSD("/05/006.mp3");
-      if (nextSong == 6) audio.connecttoSD("/05/007.mp3");
-      if (nextSong == 7) audio.connecttoSD("/05/008.mp3");
+      if (nextSong > 8) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/09/000.mp3");
+      if (nextSong == 1) audio.connecttoSD("/09/001.mp3");
+      if (nextSong == 2) audio.connecttoSD("/09/002.mp3");
+      if (nextSong == 3) audio.connecttoSD("/09/003.mp3");
+      if (nextSong == 4) audio.connecttoSD("/09/004.mp3");
+      if (nextSong == 5) audio.connecttoSD("/09/005.mp3");
+      if (nextSong == 6) audio.connecttoSD("/09/006.mp3");
+      if (nextSong == 7) audio.connecttoSD("/09/007.mp3");
+      if (nextSong == 8) audio.connecttoSD("/09/008.mp3");
       break;
   }
 }
