@@ -75,7 +75,7 @@
 #define ROTARY_ENCODER_BUTTON_PIN 7
 #define ROTARY_ENCODER_VCC_PIN 17
 #define ROTARY_ENCODER_STEPS 4
-#define CYCLE_ROT 9  //24 ref bourns PEC11R-4015F-S0024 (RS:737-7739)
+#define CYCLE_ROT 8  //9-1  //24 ref bourns PEC11R-4015F-S0024 (RS:737-7739)
 
 //instead of changing here, rather change numbers above
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
@@ -141,8 +141,8 @@ int analogSwitchuser = 0;
 int analogJackInserted = 0;
 
 //fastled
-#define NUM_LEDS 24
-#define BRIGHTNESS 20
+#define NUM_LEDS 21
+#define BRIGHTNESS 80
 #define DATA_PIN 40
 #define DATA_PIN2 38
 #define CLOCK_PIN 13  //not use
@@ -150,7 +150,6 @@ int analogJackInserted = 0;
 // Define the array of leds
 CRGB leds[NUM_LEDS];
 CRGB couleur = CRGB(0, 0, 0);
-
 
 int numero_led = 0;
 int flip_light = 0;
@@ -173,7 +172,6 @@ const int daylightOffset_sec = 3600 * 1;
 RTC_PCF8563 rtc;
 DateTime now;
 struct tm timeinfo;
-
 char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
 
@@ -188,7 +186,6 @@ volatile uint8_t tick_tock = 1;
 //fonction declaration
 void change_song(void);
 void logUart(void);
-
 
 
 
@@ -231,14 +228,15 @@ void rotary_loop() {
     Serial.print("Dossier THEME:");
     Serial.println(intNumeroDossier);
 
-    // Serial.print("Led anneau : ");
-    // Serial.println(numero_led);
+    Serial.print("Led : ");
+    Serial.println(numero_led);
 
     sprintf(name_directory, "/%02d", intNumeroDossier);
     intNbAudioFileInDir = 0;
     //listDir(SD, "/05", 1);
     listDir(SD, name_directory, 1);
 
+    nextSong = 0;
 
     switch (intNumeroDossier) {
       case 1:
@@ -269,7 +267,7 @@ void rotary_loop() {
         audio.connecttoSD("/09/000.mp3");
         break;
       default:
-        audio.connecttoSD("/05/000.mp3");
+        audio.connecttoSD("/09/000.mp3");
         break;
     }
 
@@ -784,6 +782,14 @@ void setup() {
   pinMode(I2S_GAIN, OUTPUT);
   digitalWrite(I2S_GAIN, HIGH);
 
+  // Serial.println("gain:15dB");  //15dB
+  // pinMode(I2S_GAIN, OUTPUT);
+  // digitalWrite(I2S_GAIN, LOW);
+
+  // Serial.println("gain:12dB");  //12dB
+  // pinMode(I2S_GAIN, INPUT);
+
+
   //audio web radio
   //enable AUDIO
   pinMode(PIN_ENABLE_I2S, INPUT);  // floatting left+right/2
@@ -817,6 +823,20 @@ void setup() {
 void loop() {
   nowTimeMillis = millis();
   ulong_time_now = millis();
+
+  //change gain depending jack inserted
+
+  // if (jackInserted == 1) {
+  //   //3dB casque
+  //   pinMode(I2S_GAIN, OUTPUT);
+  //   digitalWrite(I2S_GAIN, HIGH);
+  // } else {
+  //   //12db haut parleur
+  //   pinMode(I2S_GAIN, INPUT);
+  //       //3dB casque
+  //   pinMode(I2S_GAIN, OUTPUT);
+  //   digitalWrite(I2S_GAIN, HIGH);
+  // }
 
   //check jack status digital pin not analog
   if (millis() > CheckTimeJackInserted) {
@@ -913,7 +933,7 @@ void loop() {
                 break;
               case 1:
                 //15db
-                Serial.println("gain:3dB");  //3dB
+                Serial.println("gain:3dB");  //15dB
                 pinMode(I2S_GAIN, OUTPUT);
                 digitalWrite(I2S_GAIN, HIGH);
                 break;
@@ -974,20 +994,28 @@ void loop() {
       //init all led with OFF or ON
       for (i = 0; i < NUM_LEDS; i++) {
         if (flip_light == 1) {
-          leds[i] = CRGB::White;
+          // all led
+          leds[i] = CRGB::Black;
+          // 4 led only
+          leds[0] = CRGB::White;
+          leds[3] = CRGB::White;
+          leds[6] = CRGB::White;
+          leds[9] = CRGB::White;
+
         } else {
           leds[i] = CRGB::Black;
         }
       }
 
       if (ulong_time_now >= ulong_time_picture) {
-        if (flip_light == 1) {
-          leds[numero_led] = CRGB::White;
-        } else {
-          leds[numero_led] = CRGB::Black;
-        }
+        // if (flip_light == 1) {
+        //   leds[numero_led] = CRGB::White;
+        // } else {
+        //   leds[numero_led] = CRGB::Black;
+        // }
       } else {
-        leds[numero_led] = CRGB::Red;
+        //led theme
+        leds[numero_led + 12] = CRGB::Red;
       }
 
       FastLED.show();
@@ -1013,79 +1041,70 @@ void audio_eof_mp3(const char *info) {  //end of file
 void change_song(void) {
   switch (intNumeroDossier) {
     case 1:
-      if (nextSong > 2) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/01/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/01/001.mp3");
-      if (nextSong == 2) audio.connecttoSD("/01/002.mp3");
+      if (nextSong > 1) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/01/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/01/003.mp3");
       break;
     case 2:
-      if (nextSong > 5) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/02/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/02/001.mp3");
-      if (nextSong == 2) audio.connecttoSD("/02/002.mp3");
-      if (nextSong == 3) audio.connecttoSD("/02/003.mp3");
-      if (nextSong == 4) audio.connecttoSD("/02/004.mp3");
-      if (nextSong == 5) audio.connecttoSD("/02/005.mp3");
+      if (nextSong > 4) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/02/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/02/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/02/003.mp3");
+      if (nextSong == 3) audio.connecttoSD("/02/004.mp3");
+      if (nextSong == 4) audio.connecttoSD("/02/005.mp3");
       break;
     case 3:
-      if (nextSong > 4) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/03/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/03/001.mp3");
-      if (nextSong == 2) audio.connecttoSD("/03/002.mp3");
-      if (nextSong == 3) audio.connecttoSD("/03/003.mp3");
-      if (nextSong == 4) audio.connecttoSD("/03/004.mp3");
+      if (nextSong > 3) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/03/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/03/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/03/003.mp3");
+      if (nextSong == 3) audio.connecttoSD("/03/004.mp3");
       break;
     case 4:
-      if (nextSong > 2) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/04/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/04/001.mp3");
-      if (nextSong == 2) audio.connecttoSD("/04/002.mp3");
+      if (nextSong > 1) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/04/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/04/002.mp3");
       break;
     case 5:
-      if (nextSong > 1) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/05/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/05/001.mp3");
+      if (nextSong > 0) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/05/001.mp3");
       break;
     case 6:
-      if (nextSong > 3) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/06/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/06/001.mp3");
-      if (nextSong == 2) audio.connecttoSD("/06/002.mp3");
-      if (nextSong == 3) audio.connecttoSD("/06/003.mp3");
+      if (nextSong > 2) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/06/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/06/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/06/003.mp3");
       break;
     case 7:
-      if (nextSong > 1) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/07/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/07/001.mp3");
+      if (nextSong > 0) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/07/001.mp3");
       break;
     case 8:
       if (nextSong > 1) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/08/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/08/001.mp3");
+      if (nextSong == 0) audio.connecttoSD("/08/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/08/002.mp3");
       break;
     case 9:
-      if (nextSong > 8) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/09/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/09/001.mp3");
-      if (nextSong == 2) audio.connecttoSD("/09/002.mp3");
-      if (nextSong == 3) audio.connecttoSD("/09/003.mp3");
-      if (nextSong == 4) audio.connecttoSD("/09/004.mp3");
-      if (nextSong == 5) audio.connecttoSD("/09/005.mp3");
-      if (nextSong == 6) audio.connecttoSD("/09/006.mp3");
-      if (nextSong == 7) audio.connecttoSD("/09/007.mp3");
-      if (nextSong == 8) audio.connecttoSD("/09/008.mp3");
+      if (nextSong > 7) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/09/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/09/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/09/003.mp3");
+      if (nextSong == 3) audio.connecttoSD("/09/004.mp3");
+      if (nextSong == 4) audio.connecttoSD("/09/005.mp3");
+      if (nextSong == 5) audio.connecttoSD("/09/006.mp3");
+      if (nextSong == 6) audio.connecttoSD("/09/007.mp3");
+      if (nextSong == 7) audio.connecttoSD("/09/008.mp3");
       break;
     default:
-      if (nextSong > 8) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/09/000.mp3");
-      if (nextSong == 1) audio.connecttoSD("/09/001.mp3");
-      if (nextSong == 2) audio.connecttoSD("/09/002.mp3");
-      if (nextSong == 3) audio.connecttoSD("/09/003.mp3");
-      if (nextSong == 4) audio.connecttoSD("/09/004.mp3");
-      if (nextSong == 5) audio.connecttoSD("/09/005.mp3");
-      if (nextSong == 6) audio.connecttoSD("/09/006.mp3");
-      if (nextSong == 7) audio.connecttoSD("/09/007.mp3");
-      if (nextSong == 8) audio.connecttoSD("/09/008.mp3");
+      if (nextSong > 7) nextSong = 0;
+      if (nextSong == 0) audio.connecttoSD("/09/001.mp3");
+      if (nextSong == 1) audio.connecttoSD("/09/002.mp3");
+      if (nextSong == 2) audio.connecttoSD("/09/003.mp3");
+      if (nextSong == 3) audio.connecttoSD("/09/004.mp3");
+      if (nextSong == 4) audio.connecttoSD("/09/005.mp3");
+      if (nextSong == 5) audio.connecttoSD("/09/006.mp3");
+      if (nextSong == 6) audio.connecttoSD("/09/007.mp3");
+      if (nextSong == 7) audio.connecttoSD("/09/008.mp3");
       break;
   }
 }
