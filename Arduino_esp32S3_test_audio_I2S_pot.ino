@@ -53,7 +53,7 @@
 #define I2S_BCLK 36
 #define I2S_LRC 37
 #define I2S_GAIN 39
-#define PIN_ENABLE_I2S 41
+#define PIN_ENABLE_I2S 42  //41:dev board  42:protov1
 
 //PINOUT I2C RTC PCF8563
 #define SDA_PIN_RTC_PCF8563 15
@@ -65,7 +65,7 @@
 
 //button PLAY (used as gain audio)
 #define PIN_BUTTON_PLAY 18
-#define PIN_BUTTON_NEXT 18
+#define PIN_BUTTON_NEXT 8
 
 //use for turn off red light indicator after 10s
 #define TIME_PICTURE_END 10000  //milliseconds (10s)
@@ -81,15 +81,14 @@
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
 
 //neopixel
-#define PIN_NEOPIXEL 40
-#define PIN_NEOPIXEL_KIT 38
+#define PIN_ENABLE_NEOPIXEL 41  //not exit on dev board only protov1
 
 //ADC boutton switch rotatif
-#define PIN_SWITCH_THEME 1
-#define PIN_SWITCH_USER 2
+#define PIN_SWITCH_THEME 2
+#define PIN_SWITCH_USER 1
 
 //JACK CONNECTED
-#define PIN_ADC_JACK_DETECT 14
+#define PIN_ADC_JACK_DETECT 47  //14: dev board 47:protov1
 
 //audio i2S
 #define PERIOD_READ_VOLUME 50    //ms
@@ -141,14 +140,20 @@ int analogSwitchuser = 0;
 int analogJackInserted = 0;
 
 //fastled
-#define NUM_LEDS 21
+#define NUM_LEDS 9
 #define BRIGHTNESS 80
 #define DATA_PIN 40
 #define DATA_PIN2 38
 #define CLOCK_PIN 13  //not use
 
+//fastled pot
+#define NUM_LEDS2 4
+#define DATA_PIN2 38
+
 // Define the array of leds
 CRGB leds[NUM_LEDS];
+CRGB leds2[NUM_LEDS2];
+
 CRGB couleur = CRGB(0, 0, 0);
 
 int numero_led = 0;
@@ -749,7 +754,17 @@ void setup() {
   rtc.start();
 
   Serial.println("init neopixel");
+
+  //power supply led neopixel
+  pinMode(PIN_ENABLE_NEOPIXEL, OUTPUT);
+  digitalWrite(PIN_ENABLE_NEOPIXEL, LOW);  //HIGH:led off LOW:led on
+
+  //9 leds
   FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
+
+  //4 leds
+  FastLED.addLeds<NEOPIXEL, DATA_PIN2>(leds2, NUM_LEDS2);  // GRB ordering is assumed
+
   FastLED.setBrightness(BRIGHTNESS);
 
   Serial.println("init rotary");
@@ -983,28 +998,32 @@ void loop() {
         leds[i] = CRGB::Black;
       }
 
-      for (i = 0; i < map(valVolume, 0, 21, 0, 12); i++) {
+      for (i = 0; i < map(valVolume, 0, 21, 0, NUM_LEDS); i++) {
         couleur = CRGB(200, 0, 0);
-        leds[i] = couleur;
+        leds[i] = couleur;  //rouge
       }
       FastLED.show();
 
     } else {
       //Serial.println(updatevolume);
       //init all led with OFF or ON
-      for (i = 0; i < NUM_LEDS; i++) {
+      for (i = 0; i < NUM_LEDS2; i++) {
         if (flip_light == 1) {
           // all led
-          leds[i] = CRGB::Black;
+          leds2[i] = CRGB::White;
           // 4 led only
-          leds[0] = CRGB::White;
-          leds[3] = CRGB::White;
-          leds[6] = CRGB::White;
-          leds[9] = CRGB::White;
+          // leds2[0] = CRGB::White;
+          // leds2[3] = CRGB::White;
+          // leds2[6] = CRGB::White;
+          // leds2[9] = CRGB::White;
 
         } else {
-          leds[i] = CRGB::Black;
+          leds2[i] = CRGB::Black;
         }
+      }
+
+      for (i = 0; i < NUM_LEDS; i++) {
+        leds[i] = CRGB::Black;
       }
 
       if (ulong_time_now >= ulong_time_picture) {
@@ -1015,7 +1034,7 @@ void loop() {
         // }
       } else {
         //led theme
-        leds[numero_led + 12] = CRGB::Red;
+        leds[numero_led] = CRGB::Red;
       }
 
       FastLED.show();
