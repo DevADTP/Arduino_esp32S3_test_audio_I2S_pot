@@ -124,11 +124,15 @@ int i = 0;  //for
 int changeGain = 0;
 
 int readButPlay = 0;
-int buttonState;                     // the current reading from the input pin
-int buttonStateLongPress;            // the current reading from the input pin
-int lastButtonState = HIGH;          // the previous reading from the input pin
-unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
-unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
+int readButNext = 0;
+int buttonStatePlay;                     // the current reading from the input pin
+int buttonStateNext;                     // the current reading from the input pin
+int buttonStateLongPress;                // the current reading from the input pin
+int lastButtonPlay = HIGH;               // the previous reading from the input pin
+int lastButtonNext = HIGH;               // the previous reading from the input pin
+unsigned long lastDebounceTimePlay = 0;  // the last time the output pin was toggled
+unsigned long lastDebounceTimeNext = 0;  // the last time the output pin was toggled
+unsigned long debounceDelay = 50;        // the debounce time; increase if the output flickers
 
 unsigned long longPressButton = 1500;  // long time pressure button
 
@@ -822,6 +826,7 @@ void setup() {
   audio.pauseResume();
 
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
+  pinMode(PIN_BUTTON_NEXT, INPUT_PULLUP);
 
   //pullup jack detect
   pinMode(PIN_ADC_JACK_DETECT, INPUT_PULLUP);
@@ -902,74 +907,55 @@ void loop() {
 
   //PART button play change power audio
   readButPlay = digitalRead(PIN_BUTTON_PLAY);
+  readButNext = digitalRead(PIN_BUTTON_NEXT);
 
-  if (readButPlay != lastButtonState) {
+
+  if (readButPlay != lastButtonPlay) {
     // reset the debouncing timer
-    lastDebounceTime = millis();
+    lastDebounceTimePlay = millis();
+  }
+
+  if (readButNext != lastButtonNext) {
+    // reset the debouncing timer
+    lastDebounceTimeNext = millis();
   }
 
 
-  if ((millis() - lastDebounceTime) > longPressButton) {
-
-    if (readButPlay != buttonStateLongPress) {
-      buttonStateLongPress = readButPlay;
-
-      //test pause/play
-      Serial.println("Long press PLAY/PAUSE");  //15dB
-      audio.pauseResume();
-    }
-  }
-
-
-  if ((millis() - lastDebounceTime) > debounceDelay) {
-    // whatever the readButPlay is at, it's been there for longer than the debounce
-    // delay, so take it as the actual current state:
-
+  if ((millis() - lastDebounceTimeNext) > debounceDelay) {
+    //test pause/play
     // if the button state has changed:
-    if (readButPlay != buttonState) {
-      buttonState = readButPlay;
+    if (readButNext != buttonStateNext) {
+      buttonStateNext = readButNext;
 
-      //detect long press no effect
-      if (!((millis() - lastDebounceTime) > longPressButton)) {
-        // only toggle the LED if the new button state is HIGH
-        if (buttonState == HIGH) {
-
-          //test gain
-          if (false) {
-            changeGain++;
-            if (changeGain > 2) changeGain = 0;
-
-            switch (changeGain) {
-              case 0:
-                //3db
-                Serial.println("gain:15dB");  //15dB
-                pinMode(I2S_GAIN, OUTPUT);
-                digitalWrite(I2S_GAIN, LOW);
-                break;
-              case 1:
-                //15db
-                Serial.println("gain:3dB");  //15dB
-                pinMode(I2S_GAIN, OUTPUT);
-                digitalWrite(I2S_GAIN, HIGH);
-                break;
-              default:
-                //12db
-                Serial.println("gain:12dB");  //12dB
-                pinMode(I2S_GAIN, INPUT);
-                break;
-            }
-          }
-          // end test gain
-
-          nextSong++;
-          Serial.println("Next Song click");
-          change_song();
-        }
+      // only toggle the LED if the new button state is HIGH
+      if (buttonStateNext == HIGH) {
+        nextSong++;
+        Serial.println("Next Song click");
+        change_song();
       }
     }
   }
 
-  lastButtonState = readButPlay;
+
+  if ((millis() - lastDebounceTimePlay) > debounceDelay) {
+    // whatever the readButPlay is at, it's been there for longer than the debounce
+    // delay, so take it as the actual current state:
+
+    // if the button state has changed:
+    if (readButPlay != buttonStatePlay) {
+      buttonStatePlay = readButPlay;
+
+      //detect long press no effect
+      // only toggle the LED if the new button state is HIGH
+      if (buttonStatePlay == HIGH) {
+        Serial.println("Long press PLAY/PAUSE");  //15dB
+        audio.pauseResume();
+      }
+    }
+  }
+
+  lastButtonPlay = readButPlay;
+  lastButtonNext = readButNext;
   //END PART button play change power audio
 
 
