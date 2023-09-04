@@ -87,6 +87,9 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 #define PIN_SWITCH_THEME 2
 #define PIN_SWITCH_USER 1
 
+//BATTERY VOLTAGE
+#define PIN_BAT_MEAS 14
+
 //JACK CONNECTED
 #define PIN_ADC_JACK_DETECT 47  //14: dev board 47:protov1
 
@@ -107,12 +110,12 @@ Audio audio;
 String ssid = "*****************";
 String password = "**********************";
 
-#define WIFI_ACTIVE 0       //default 1  update RTC on NTP server
-#define TEST_GAIN_VOLUME 0  //default 0
-#define TEST_LED 1          //default 0
-#define LAMPE_NB_COLOR 8    //default 1   8 mode 4 couleurs top/bottom & 4 couleurs top/bottom off
-#define AUDIO_ACTIVE 0      //default 1
-#define RTC_ACTIVE 0        //default 1
+#define WIFI_ACTIVE       0  //default 1  update RTC on NTP server
+#define TEST_GAIN_VOLUME  0  //default 0
+#define TEST_LED          1  //default 0  1:test led
+#define LAMPE_NB_COLOR    8  //default 1  8:mode 4 couleurs top/bottom & 4 couleurs top/bottom off
+#define AUDIO_ACTIVE      0  //default 1
+#define RTC_ACTIVE        0  //default 1
 
 int int_test_volume = 0;
 int int_test_led = 0;
@@ -157,6 +160,10 @@ int nextSong = 0;
 int analogSwitchTheme = 0;
 int analogSwitchuser = 0;
 int analogJackInserted = 0;
+int analogBatVoltage = 0;  //PIN_BAT_MEAS
+int matAnalogBatVoltage[16];
+long int sumBatVoltage = 0;
+int indiceBatVoltage = 0;
 
 //fastled
 #define NUM_LEDS 9
@@ -911,6 +918,22 @@ void loop() {
     //Serial.printf("ADC mV jack = %d\n", analogJackInserted);
     //Serial.printf("%d\n", analogJackInserted);
     //Serial.printf("%d,%d\n", jackInsertedCnt, jackInserted);
+
+    //Battery voltage adc@3.1V
+    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+
+    indiceBatVoltage++;
+    sumBatVoltage = (sumBatVoltage - matAnalogBatVoltage[indiceBatVoltage% 16]);
+    sumBatVoltage = analogBatVoltage + sumBatVoltage;
+
+    matAnalogBatVoltage[indiceBatVoltage % 16] = analogBatVoltage;
+
+    //analogBatVoltage = analogBatVoltage * 100 / 695;  //ratio Vout/Vin=0.6
+    analogBatVoltage = (sumBatVoltage>>4) * 100 / 695;  //ratio Vout/Vin=0.6
   }
 
 
@@ -1073,10 +1096,10 @@ void loop() {
               leds2[i] = CRGB(0, 255, 0);  //verte
               break;
             case 3:
-              leds2[i] = CRGB(255, 0, 0);  //rouge
+              leds2[i] = CRGB(0, 0, 255);  //bleu
               break;
             case 4:
-              leds2[i] = CRGB(0, 0, 255);  //bleu
+              leds2[i] = CRGB(255, 0, 0);  //rouge
               break;
             case 5:
               leds2[i] = CRGB(0, 0, 0);  //noir
@@ -1116,28 +1139,28 @@ void loop() {
         //leds[numero_led] = CRGB::Red;
         switch (flip_light) {
           case 1:
-            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
           case 2:
             leds[numero_led] = CRGB(0, 255, 0);  //verte
             break;
           case 3:
-            leds[numero_led] = CRGB(255, 0, 0);  //rouge
-            break;
-          case 4:
             leds[numero_led] = CRGB(0, 0, 255);  //bleu
             break;
-          case 5:
+          case 4:
             leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            break;
+          case 5:
+            leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
           case 6:
             leds[numero_led] = CRGB(0, 255, 0);  //verte
             break;
           case 7:
-            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            leds[numero_led] = CRGB(0, 0, 255);  //bleu
             break;
           case 8:
-            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            leds[numero_led] = CRGB(255, 255, 255);  //blanc
             break;
           default:
             leds[numero_led] = CRGB(255, 0, 0);  //rouge
@@ -1246,6 +1269,8 @@ void logUart(void) {
     Serial.printf("%d,", analogSwitchTheme);
     Serial.printf("%d,", analogSwitchuser);
     Serial.printf("%d,%d,", jackInsertedCnt, jackInserted);
+    Serial.printf("%d,", analogBatVoltage);
+
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
   }
