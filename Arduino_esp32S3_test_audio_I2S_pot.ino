@@ -90,6 +90,9 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 //BATTERY VOLTAGE
 #define PIN_BAT_MEAS 14
 
+//CHARGE BATTERY STATUS
+#define PIN_CHARGE_STATUS 9
+
 //JACK CONNECTED
 #define PIN_ADC_JACK_DETECT 47  //14: dev board 47:protov1
 
@@ -110,12 +113,12 @@ Audio audio;
 String ssid = "*****************";
 String password = "**********************";
 
-#define WIFI_ACTIVE       0  //default 1  update RTC on NTP server
-#define TEST_GAIN_VOLUME  0  //default 0
-#define TEST_LED          1  //default 0  1:test led
-#define LAMPE_NB_COLOR    8  //default 1  8:mode 4 couleurs top/bottom & 4 couleurs top/bottom off
-#define AUDIO_ACTIVE      0  //default 1
-#define RTC_ACTIVE        0  //default 1
+#define WIFI_ACTIVE 0       //default 1  update RTC on NTP server
+#define TEST_GAIN_VOLUME 0  //default 0
+#define TEST_LED 1          //default 0  1:test led
+#define LAMPE_NB_COLOR 20   //default 1  20:mix cobinaison couleur  top/bottom
+#define AUDIO_ACTIVE 0      //default 1
+#define RTC_ACTIVE 0        //default 1
 
 int int_test_volume = 0;
 int int_test_led = 0;
@@ -164,6 +167,9 @@ int analogBatVoltage = 0;  //PIN_BAT_MEAS
 int matAnalogBatVoltage[16];
 long int sumBatVoltage = 0;
 int indiceBatVoltage = 0;
+
+//battery
+int chargeStatus = 0;
 
 //fastled
 #define NUM_LEDS 9
@@ -927,13 +933,16 @@ void loop() {
     analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
 
     indiceBatVoltage++;
-    sumBatVoltage = (sumBatVoltage - matAnalogBatVoltage[indiceBatVoltage% 16]);
+    sumBatVoltage = (sumBatVoltage - matAnalogBatVoltage[indiceBatVoltage % 16]);
     sumBatVoltage = analogBatVoltage + sumBatVoltage;
 
     matAnalogBatVoltage[indiceBatVoltage % 16] = analogBatVoltage;
 
     //analogBatVoltage = analogBatVoltage * 100 / 695;  //ratio Vout/Vin=0.6
-    analogBatVoltage = (sumBatVoltage>>4) * 100 / 695;  //ratio Vout/Vin=0.6
+    analogBatVoltage = (sumBatVoltage >> 4) * 100 / 695;  //ratio Vout/Vin=0.6
+
+    //Charge status
+    chargeStatus = digitalRead(PIN_CHARGE_STATUS);
   }
 
 
@@ -1093,24 +1102,60 @@ void loop() {
               leds2[i] = CRGB(255, 255, 255);  //blanc
               break;
             case 2:
-              leds2[i] = CRGB(0, 255, 0);  //verte
+              leds2[i] = CRGB(255, 255, 255);  //blanc
               break;
             case 3:
-              leds2[i] = CRGB(0, 0, 255);  //bleu
+              leds2[i] = CRGB(255, 255, 255);  //blanc
               break;
             case 4:
-              leds2[i] = CRGB(255, 0, 0);  //rouge
+              leds2[i] = CRGB(255, 255, 255);  //blanc
               break;
             case 5:
-              leds2[i] = CRGB(0, 0, 0);  //noir
+              leds2[i] = CRGB(0, 255, 0);  //vert
               break;
             case 6:
-              leds2[i] = CRGB(0, 0, 0);  //noir
+              leds2[i] = CRGB(0, 255, 0);  //vert
               break;
             case 7:
-              leds2[i] = CRGB(0, 0, 0);  //noir
+              leds2[i] = CRGB(0, 255, 0);  //vert
               break;
             case 8:
+              leds2[i] = CRGB(0, 255, 0);  //vert
+              break;
+            case 9:
+              leds2[i] = CRGB(255, 0, 0);  //rouge
+              break;
+            case 10:
+              leds2[i] = CRGB(255, 0, 0);  //rouge
+              break;
+            case 11:
+              leds2[i] = CRGB(255, 0, 0);  //rouge
+              break;
+            case 12:
+              leds2[i] = CRGB(255, 0, 0);  //rouge
+              break;
+            case 13:
+              leds2[i] = CRGB(0, 0, 255);  //bleu
+              break;
+            case 14:
+              leds2[i] = CRGB(0, 0, 255);  //bleu
+              break;
+            case 15:
+              leds2[i] = CRGB(0, 0, 255);  //bleu
+              break;
+            case 16:
+              leds2[i] = CRGB(0, 0, 255);  //bleu
+              break;
+            case 17:
+              leds2[i] = CRGB(0, 0, 0);  //noir
+              break;
+            case 18:
+              leds2[i] = CRGB(0, 0, 0);  //noir
+              break;
+            case 19:
+              leds2[i] = CRGB(0, 0, 0);  //noir
+              break;
+            case 20:
               leds2[i] = CRGB(0, 0, 0);  //noir
               break;
             default:
@@ -1135,14 +1180,14 @@ void loop() {
         //   leds[numero_led] = CRGB::Black;
         // }
       } else {
-        //led theme
+        //9 leds
         //leds[numero_led] = CRGB::Red;
         switch (flip_light) {
           case 1:
             leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
           case 2:
-            leds[numero_led] = CRGB(0, 255, 0);  //verte
+            leds[numero_led] = CRGB(0, 255, 0);  //vert
             break;
           case 3:
             leds[numero_led] = CRGB(0, 0, 255);  //bleu
@@ -1154,12 +1199,48 @@ void loop() {
             leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
           case 6:
-            leds[numero_led] = CRGB(0, 255, 0);  //verte
+            leds[numero_led] = CRGB(0, 255, 0);  //vert
             break;
           case 7:
             leds[numero_led] = CRGB(0, 0, 255);  //bleu
             break;
           case 8:
+            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            break;
+          case 9:
+            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            break;
+          case 10:
+            leds[numero_led] = CRGB(0, 255, 0);  //vert
+            break;
+          case 11:
+            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            break;
+          case 12:
+            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            break;
+          case 13:
+            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            break;
+          case 14:
+            leds[numero_led] = CRGB(0, 255, 0);  //vert
+            break;
+          case 15:
+            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            break;
+          case 16:
+            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            break;
+          case 17:
+            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            break;
+          case 18:
+            leds[numero_led] = CRGB(0, 255, 0);  //vert
+            break;
+          case 19:
+            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            break;
+          case 20:
             leds[numero_led] = CRGB(255, 255, 255);  //blanc
             break;
           default:
@@ -1270,6 +1351,8 @@ void logUart(void) {
     Serial.printf("%d,", analogSwitchuser);
     Serial.printf("%d,%d,", jackInsertedCnt, jackInserted);
     Serial.printf("%d,", analogBatVoltage);
+
+    Serial.printf("%d,", chargeStatus);
 
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
