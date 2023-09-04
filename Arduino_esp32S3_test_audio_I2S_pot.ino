@@ -101,9 +101,24 @@ Audio audio;
 //PERIOD DEFINE
 #define PERIOD_LOG_UART 1000  //ms updateTimeGain
 
-
+//PARAMETERS
+//--------------------------------------------------------------------------------------------
+//WIFI
 String ssid = "*****************";
 String password = "**********************";
+
+#define WIFI_ACTIVE 0       //default 1  update RTC on NTP server
+#define TEST_GAIN_VOLUME 0  //default 0
+#define TEST_LED 1          //default 0
+#define LAMPE_NB_COLOR 8    //default 1   8 mode 4 couleurs top/bottom & 4 couleurs top/bottom off
+#define AUDIO_ACTIVE 0      //default 1
+#define RTC_ACTIVE 0        //default 1
+
+int int_test_volume = 0;
+int int_test_led = 0;
+
+//PARAMETERS
+//--------------------------------------------------------------------------------------------
 
 long int valVolume = 0;
 long int valVolumeold = 0;
@@ -145,7 +160,7 @@ int analogJackInserted = 0;
 
 //fastled
 #define NUM_LEDS 9
-#define BRIGHTNESS 80
+#define BRIGHTNESS 200
 #define DATA_PIN 40
 #define DATA_PIN2 38
 #define CLOCK_PIN 13  //not use
@@ -216,11 +231,8 @@ void rotary_onButtonClick() {
   Serial.print(millis());
   Serial.println(" milliseconds after restart");
 
-  if (flip_light == 1) {
-    flip_light = 0;
-  } else {
-    flip_light = 1;
-  }
+  flip_light++;
+  if (flip_light > LAMPE_NB_COLOR) flip_light = 0;
 
   ulong_time_picture = millis() + TIME_PICTURE_END;
 }
@@ -542,7 +554,9 @@ void printLocalTime() {
 
 
   //RTC PCF8563
-  now = rtc.now();
+  if (RTC_ACTIVE == 1) {
+    now = rtc.now();
+  }
 
   Serial.print(now.year(), DEC);
   Serial.print('/');
@@ -618,7 +632,7 @@ void jackChangeInterrupt() {
 
 
 void setup() {
-  delay(1000);
+  //delay(1000);
 
   //  HWSerial.begin(2000000);
   //  HWSerial.setDebugOutput(true);
@@ -630,8 +644,9 @@ void setup() {
   //  USB.begin();
   //
   Serial.begin(2000000);  //uart debug:2000000   uart_usb_otg:115200
-  while (!Serial) {
-  }
+  delay(20);
+  //while (!Serial) {
+  // }
   Serial.println("************************************************************");
   Serial.println("START PROGRAM");
   Serial.println("************************************************************");
@@ -641,121 +656,101 @@ void setup() {
   analogReadResolution(12);
 
   //I2C RTC
-  Wire.begin(SDA_PIN_RTC_PCF8563, SCL_PIN_RTC_PCF8563);  //SDA SCL
-  pinMode(IRQ_PIN_RTC_PCF8563, INPUT);                   // set up interrupt pin
-  digitalWrite(IRQ_PIN_RTC_PCF8563, HIGH);               // turn on pullup resistors
-  // attach interrupt to set_tick_tock callback on rising edge of INT0
-  attachInterrupt(digitalPinToInterrupt(IRQ_PIN_RTC_PCF8563), set_tick_tock, RISING);
+  if (RTC_ACTIVE == 1) {
+    Wire.begin(SDA_PIN_RTC_PCF8563, SCL_PIN_RTC_PCF8563);  //SDA SCL
+    pinMode(IRQ_PIN_RTC_PCF8563, INPUT);                   // set up interrupt pin
+    digitalWrite(IRQ_PIN_RTC_PCF8563, HIGH);               // turn on pullup resistors
+    // attach interrupt to set_tick_tock callback on rising edge of INT0
+    attachInterrupt(digitalPinToInterrupt(IRQ_PIN_RTC_PCF8563), set_tick_tock, RISING);
 
-  if (!rtc.begin()) {
-    Serial.println("Couldn't find RTC");
-    Serial.flush();
-    while (1) delay(10);
-  } else {
-    Serial.println("RTC PCF8563 detect");
+    if (!rtc.begin()) {
+      Serial.println("Couldn't find RTC");
+      Serial.flush();
+      while (1) delay(10);
+    } else {
+      Serial.println("RTC PCF8563 detect");
+    }
   }
 
-  //SPI SDCARD
-  //  Serial.println("SPI board default:");
-  //  Serial.print("MOSI: ");
-  //  Serial.println(MOSI);
-  //  Serial.print("MISO: ");
-  //  Serial.println(MISO);
-  //  Serial.print("SCK: ");
-  //  Serial.println(SCK);
-  //  Serial.print("SS: ");
-  //  Serial.println(SS);
-
   //sd card
-  pinMode(SD_CS, OUTPUT);
-  digitalWrite(SD_CS, LOW);
-  delay(10);
-  digitalWrite(SD_CS, HIGH);
-  //SPI.begin(SCK, MISO, MOSI, SS);
-  SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, SD_CS);
+  if (AUDIO_ACTIVE == 1) {
+    pinMode(SD_CS, OUTPUT);
+    digitalWrite(SD_CS, LOW);
+    delay(10);
+    digitalWrite(SD_CS, HIGH);
+    //SPI.begin(SCK, MISO, MOSI, SS);
+    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, SD_CS);
 
-  //SD card
-  initSDCard();
+    //SD card
+    initSDCard();
 
-  //  Serial.println("dir racine");
-  //  listDir(SD, "/", 0);
-  //  Serial.println("Contenu carte SD : ");
-  //  intNbAudioFileInDir = 0;
-  //  listDir(SD, "/", 1);
-  //
-  //  intNbAudioFileInDir = 0;
-  //  listDir(SD, "/05", 0);
-  //
-  //  Serial.println("Contenu dossier 01 : ");
-  //  intNbAudioFileInDir = 0;
-  //  listDir(SD, "/01", 1);
-  //  Serial.println("dir 01");
-  //  listDir(SD, "/01", 0);
-
-  //  writeFile(SD, "/hello.txt", "Hello ");
-  //  appendFile(SD, "/hello.txt", "World!\n");
-  //  readFile(SD, "/hello.txt");
-  //  deleteFile(SD, "/foo.txt");
-  //  renameFile(SD, "/hello.txt", "/foo.txt");
-  //  readFile(SD, "/foo.txt");
-  //  testFileIO(SD, "/test.txt");
-  Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
-  Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
+    Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
+    Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
+  }
 
   //memoire PSRAM
   Serial.println((String) "Memoire disponible dans la PSRAM : " + ESP.getFreePsram());
 
   //wifi
-  WiFi.disconnect();
+  if (WIFI_ACTIVE == 1) {
+    WiFi.disconnect();
 
-  WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_STA);
 
-  WiFi.begin(ssid.c_str(), password.c_str());
+    WiFi.begin(ssid.c_str(), password.c_str());
 
-  Serial.print("WIFI connect :");
-  while (WiFi.status() != WL_CONNECTED) {
-    intWifiConnectRetry++;
-    Serial.print(".");
-    delay(100);
-    if (intWifiConnectRetry >= 200) break;
-  }
+    Serial.print("WIFI connect :");
+    while (WiFi.status() != WL_CONNECTED) {
+      intWifiConnectRetry++;
+      Serial.print(".");
+      delay(100);
+      if (intWifiConnectRetry >= 200) break;
+    }
 
-  if (intWifiConnectRetry >= 20) {
-    Serial.println("wifi PROBLEM not connected");
-  } else {
-    Serial.println("wifi OK");
-  }
-  delay(1500);
+    if (intWifiConnectRetry >= 20) {
+      Serial.println("wifi PROBLEM not connected");
+    } else {
+      Serial.println("wifi OK");
+    }
+    delay(1500);
 
-  //  Serial.print("DATETIME avant: ");
-  //  Serial.print(__DATE__);
-  //  Serial.print(" - ");
-  //  Serial.println(__TIME__);
+    //  Serial.print("DATETIME avant: ");
+    //  Serial.print(__DATE__);
+    //  Serial.print(" - ");
+    //  Serial.println(__TIME__);
 
-  //get time ntp
-  // Init and get the time
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  printLocalTime();
+    //get time ntp
+    // Init and get the time
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    printLocalTime();
 
-  //update time in RTC
-  //structure tm (int8_t wday, int16_t year, int8_t mon, int8_t mday, int8_t hour, int8_t min, int8_t sec)
-  // January 21, 2014 at 3am you would call:
-  // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-  Serial.print("Extract time : ");
-  Serial.print((timeinfo.tm_year + 1900));
-  Serial.print("_");
-  Serial.print(timeinfo.tm_mon + 1);
-  Serial.print("_");
-  Serial.print(timeinfo.tm_mday);
-  Serial.print("_");
-  Serial.print(timeinfo.tm_hour);
-  Serial.print("_");
-  Serial.print(timeinfo.tm_min);
-  Serial.print("_");
-  Serial.println(timeinfo.tm_sec);
+    //update time in RTC
+    //structure tm (int8_t wday, int16_t year, int8_t mon, int8_t mday, int8_t hour, int8_t min, int8_t sec)
+    // January 21, 2014 at 3am you would call:
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+    Serial.print("Extract time : ");
+    Serial.print((timeinfo.tm_year + 1900));
+    Serial.print("_");
+    Serial.print(timeinfo.tm_mon + 1);
+    Serial.print("_");
+    Serial.print(timeinfo.tm_mday);
+    Serial.print("_");
+    Serial.print(timeinfo.tm_hour);
+    Serial.print("_");
+    Serial.print(timeinfo.tm_min);
+    Serial.print("_");
+    Serial.println(timeinfo.tm_sec);
 
-  rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
-  rtc.start();
+    //reglage RTC with wifi NTP
+    if (RTC_ACTIVE == 1) {
+      rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+      rtc.start();
+    }
+
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+
+  }  //wifi define
 
   Serial.println("init neopixel");
 
@@ -770,6 +765,22 @@ void setup() {
   FastLED.addLeds<NEOPIXEL, DATA_PIN2>(leds2, NUM_LEDS2);  // GRB ordering is assumed
 
   FastLED.setBrightness(BRIGHTNESS);
+
+  //start animation
+  for (i = 0; i < NUM_LEDS; i++) {
+    leds[i % 3] = CRGB(0, 0, 150);
+    leds[i % 3 + 3] = CRGB(70, 70, 70);
+    leds[i % 3 + 6] = CRGB(200, 0, 0);
+    delay(200);
+    FastLED.show();
+  }
+
+  delay(1000);
+
+  for (i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB(0, 0, 0);
+  }
+  FastLED.show();
 
   Serial.println("init rotary");
   pinMode(ROTARY_ENCODER_A_PIN, INPUT_PULLUP);
@@ -797,33 +808,42 @@ void setup() {
   ulong_time_picture = millis() + TIME_PICTURE_END;
 
   //gain audio
-  Serial.println("gain:3dB");  //3dB
-  pinMode(I2S_GAIN, OUTPUT);
-  digitalWrite(I2S_GAIN, HIGH);
 
-  // Serial.println("gain:15dB");  //15dB
+  Serial.println("gain:3dB");  //GAIN_SLOT=Pull-up 3.3V -> 3 dB
+  pinMode(I2S_GAIN, INPUT_PULLUP);
+
+  // Serial.println("gain:6dB");  //GAIN_SLOT=VDD=3.3V -> 6dB
+  // pinMode(I2S_GAIN, OUTPUT);
+  // digitalWrite(I2S_GAIN, HIGH);
+
+  // Serial.println("gain:9dB");  //GAIN_SLOT=floating input -> 9dB
+  // pinMode(I2S_GAIN, INPUT);
+
+  // Serial.println("gain:12dB");  //GAIN_SLOT=GND -> 12dB
   // pinMode(I2S_GAIN, OUTPUT);
   // digitalWrite(I2S_GAIN, LOW);
 
-  // Serial.println("gain:12dB");  //12dB
-  // pinMode(I2S_GAIN, INPUT);
-
+  // Serial.println("gain:15dB");  //GAIN_SLOT=Pull-down GND -> 15 dB
+  // pinMode(I2S_GAIN, INPUT_PULLDOWN);
 
   //audio web radio
   //enable AUDIO
   pinMode(PIN_ENABLE_I2S, INPUT);  // floatting left+right/2
-  audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-  audio.setBalance(-16);  // mutes the left channel
-  audio.setVolume(0);
-  audio.forceMono(true);  //mono application
 
-  //stream music
-  //audio.connecttohost("http://vis.media-ice.musicradio.com/CapitalMP3");
+  if (AUDIO_ACTIVE == 1) {
+    audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+    audio.setBalance(-16);  // mutes the left channel
+    audio.setVolume(0);
+    audio.forceMono(true);  //mono application
 
-  //sd musique
-  //audio.connecttoFS(SD, "/04/001.mp3");
-  audio.connecttoSD("/04/001.mp3");
-  audio.pauseResume();
+    //stream music
+    //audio.connecttohost("http://vis.media-ice.musicradio.com/CapitalMP3");
+
+    //sd musique
+    //audio.connecttoFS(SD, "/04/001.mp3");
+    audio.connecttoSD("/04/001.mp3");
+    audio.pauseResume();
+  }
 
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
   pinMode(PIN_BUTTON_NEXT, INPUT_PULLUP);
@@ -898,8 +918,10 @@ void loop() {
   logUart();
 
   //update dispay time
-  if (millis() > updateTimeHorloge) {
-    printLocalTime();
+  if (WIFI_ACTIVE == 1) {
+    if (millis() > updateTimeHorloge) {
+      printLocalTime();
+    }
   }
 
   //in loop call your custom function which will process rotary encoder values
@@ -931,7 +953,15 @@ void loop() {
       if (buttonStateNext == HIGH) {
         nextSong++;
         Serial.println("Next Song click");
-        change_song();
+        if (TEST_LED == 0) {
+          if (AUDIO_ACTIVE == 1) {
+            change_song();
+          }
+        } else {
+          int_test_led = int_test_led + 10;
+          if (int_test_led >= BRIGHTNESS) int_test_led = 0;
+          FastLED.setBrightness(int_test_led);
+        }
       }
     }
   }
@@ -949,7 +979,43 @@ void loop() {
       // only toggle the LED if the new button state is HIGH
       if (buttonStatePlay == HIGH) {
         Serial.println("Long press PLAY/PAUSE");  //15dB
-        audio.pauseResume();
+        if (TEST_GAIN_VOLUME == 0) {
+          if (AUDIO_ACTIVE == 1) {
+            audio.pauseResume();
+          }
+        } else {
+          int_test_volume++;
+          if (int_test_volume >= 5) int_test_volume = 0;
+
+          switch (int_test_volume) {
+            case 0:
+              Serial.println("gain:3dB");  //GAIN_SLOT=Pull-up 3.3V -> 3 dB
+              pinMode(I2S_GAIN, INPUT_PULLUP);
+              break;
+            case 1:
+              Serial.println("gain:6dB");  //GAIN_SLOT=VDD=3.3V -> 6dB
+              pinMode(I2S_GAIN, OUTPUT);
+              digitalWrite(I2S_GAIN, HIGH);
+              break;
+            case 2:
+              Serial.println("gain:9dB");  //GAIN_SLOT=floating input -> 9dB
+              pinMode(I2S_GAIN, INPUT);
+              break;
+            case 3:
+              Serial.println("gain:12dB");  //GAIN_SLOT=GND -> 12dB
+              pinMode(I2S_GAIN, OUTPUT);
+              digitalWrite(I2S_GAIN, LOW);
+              break;
+            case 4:
+              Serial.println("gain:15dB");  //GAIN_SLOT=Pull-down GND -> 15 dB
+              pinMode(I2S_GAIN, INPUT_PULLDOWN);
+              break;
+            default:
+              //none
+              Serial.println("gain: no change");
+              break;
+          }
+        }
       }
     }
   }
@@ -963,7 +1029,7 @@ void loop() {
   if (nowTimeMillis > updateTimeVolume) {
     updateTimeVolume = nowTimeMillis + PERIOD_READ_VOLUME;
 
-    valVolume = analogRead(PIN_VOLUME);
+    valVolume = 4095 - analogRead(PIN_VOLUME);
     valVolume = (valVolume * 21) / 4095;
 
     if (valVolume >= 21) valVolume = 21;
@@ -973,12 +1039,15 @@ void loop() {
     if ((valVolumeold - valVolume) > 1) updatevolume = 1;
 
     if (updatevolume == 1) {
+
       Serial.print(valVolume);
       Serial.print(",");
       Serial.println(updatevolume);
       updatevolume = 0;
       valVolumeold = valVolume;
-      audio.setVolume(valVolume);  // 0...21
+      if (AUDIO_ACTIVE == 1) {
+        audio.setVolume(valVolume);  // 0...21
+      }
 
       for (i = 0; i < NUM_LEDS; i++) {
         leds[i] = CRGB::Black;
@@ -994,14 +1063,38 @@ void loop() {
       //Serial.println(updatevolume);
       //init all led with OFF or ON
       for (i = 0; i < NUM_LEDS2; i++) {
-        if (flip_light == 1) {
-          // all led
-          leds2[i] = CRGB::White;
-          // 4 led only
-          // leds2[0] = CRGB::White;
-          // leds2[3] = CRGB::White;
-          // leds2[6] = CRGB::White;
-          // leds2[9] = CRGB::White;
+        if (flip_light >= 1) {
+          //4 led lampe
+          switch (flip_light) {
+            case 1:
+              leds2[i] = CRGB(255, 255, 255);  //blanc
+              break;
+            case 2:
+              leds2[i] = CRGB(0, 255, 0);  //verte
+              break;
+            case 3:
+              leds2[i] = CRGB(255, 0, 0);  //rouge
+              break;
+            case 4:
+              leds2[i] = CRGB(0, 0, 255);  //bleu
+              break;
+            case 5:
+              leds2[i] = CRGB(0, 0, 0);  //noir
+              break;
+            case 6:
+              leds2[i] = CRGB(0, 0, 0);  //noir
+              break;
+            case 7:
+              leds2[i] = CRGB(0, 0, 0);  //noir
+              break;
+            case 8:
+              leds2[i] = CRGB(0, 0, 0);  //noir
+              break;
+            default:
+              leds2[i] = CRGB(255, 255, 255);  //blanc
+              break;
+          }
+
 
         } else {
           leds2[i] = CRGB::Black;
@@ -1020,14 +1113,45 @@ void loop() {
         // }
       } else {
         //led theme
-        leds[numero_led] = CRGB::Red;
+        //leds[numero_led] = CRGB::Red;
+        switch (flip_light) {
+          case 1:
+            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            break;
+          case 2:
+            leds[numero_led] = CRGB(0, 255, 0);  //verte
+            break;
+          case 3:
+            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            break;
+          case 4:
+            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            break;
+          case 5:
+            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            break;
+          case 6:
+            leds[numero_led] = CRGB(0, 255, 0);  //verte
+            break;
+          case 7:
+            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            break;
+          case 8:
+            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            break;
+          default:
+            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            break;
+        }
       }
 
       FastLED.show();
     }
   }
 
-  audio.loop();
+  if (AUDIO_ACTIVE == 1) {
+    audio.loop();
+  }
 }
 
 
