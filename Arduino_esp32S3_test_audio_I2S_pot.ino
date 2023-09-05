@@ -121,7 +121,7 @@ String password = "**********************";
 #define RTC_ACTIVE 0        //default 1
 
 int int_test_volume = 0;
-int int_test_led = 0;
+int int_test_led = 50;
 
 //PARAMETERS
 //--------------------------------------------------------------------------------------------
