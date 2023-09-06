@@ -113,12 +113,12 @@ Audio audio;
 String ssid = "*****************";
 String password = "**********************";
 
-#define WIFI_ACTIVE 0       //default 1  update RTC on NTP server
+#define WIFI_ACTIVE 1       //default 1  update RTC on NTP server
 #define TEST_GAIN_VOLUME 0  //default 0
-#define TEST_LED 1          //default 0  1:test led
-#define LAMPE_NB_COLOR 20   //default 1  20:mix cobinaison couleur  top/bottom
-#define AUDIO_ACTIVE 0      //default 1
-#define RTC_ACTIVE 0        //default 1
+#define TEST_LED 0          //default 0  1:test led
+#define LAMPE_NB_COLOR 1    //default 1  20:mix cobinaison couleur  top/bottom
+#define AUDIO_ACTIVE 1      //default 1
+#define RTC_ACTIVE 1        //default 1
 
 int int_test_volume = 0;
 int int_test_led = 50;
@@ -223,7 +223,7 @@ volatile uint8_t tick_tock = 1;
 //fonction declaration
 void change_song(void);
 void logUart(void);
-
+void readBatLevel(void);
 
 
 // INT0 interrupt callback; update tick_tock flag
@@ -869,6 +869,11 @@ void setup() {
   //turn off wifi
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
+
+  //battery level
+  for (i = 0; i < 16; i++) {
+    readBatLevel();
+  }
 }
 
 
@@ -926,20 +931,7 @@ void loop() {
     //Serial.printf("%d,%d\n", jackInsertedCnt, jackInserted);
 
     //Battery voltage adc@3.1V
-    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
-    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
-    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
-    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
-    analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
-
-    indiceBatVoltage++;
-    sumBatVoltage = (sumBatVoltage - matAnalogBatVoltage[indiceBatVoltage % 16]);
-    sumBatVoltage = analogBatVoltage + sumBatVoltage;
-
-    matAnalogBatVoltage[indiceBatVoltage % 16] = analogBatVoltage;
-
-    //analogBatVoltage = analogBatVoltage * 100 / 695;  //ratio Vout/Vin=0.6
-    analogBatVoltage = (sumBatVoltage >> 4) * 100 / 695;  //ratio Vout/Vin=0.6
+    readBatLevel();
 
     //Charge status
     chargeStatus = digitalRead(PIN_CHARGE_STATUS);
@@ -1357,4 +1349,23 @@ void logUart(void) {
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
   }
+}
+
+
+void readBatLevel(void) {
+  //Battery voltage adc@3.1V
+  analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+
+  indiceBatVoltage++;
+  sumBatVoltage = (sumBatVoltage - matAnalogBatVoltage[indiceBatVoltage % 16]);
+  sumBatVoltage = analogBatVoltage + sumBatVoltage;
+
+  matAnalogBatVoltage[indiceBatVoltage % 16] = analogBatVoltage;
+
+  //analogBatVoltage = analogBatVoltage * 100 / 695;  //ratio Vout/Vin=0.6
+  analogBatVoltage = (sumBatVoltage >> 4) * 100 / 695;  //ratio Vout/Vin=0.6
 }
