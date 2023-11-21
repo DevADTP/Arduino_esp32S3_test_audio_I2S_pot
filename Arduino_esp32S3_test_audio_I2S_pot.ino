@@ -7,6 +7,12 @@
   - neopixel  : https://github.com/FastLED/FastLED.git
   - rotary encoder : https://github.com/igorantolic/ai-esp32-rotary-encoder.git1
   - RTC PCF8563 : https://github.com/adafruit/RTClib.git
+  - cryto : https://github.com/rweather/arduinolibs.git
+
+  PSRAM externe : OSPI PSRAM that embed ESP32-S3R8, pins IO35, IO36, and IO37 
+  io35 : SD_DAC (I2S audio)
+  io36 : SCK_DAC (I2S audio)
+  io37 : WS_DAC (I2S audio)
 */
 
 //#if ARDUINO_USB_MODE
@@ -49,9 +55,9 @@
 #define SPI_SCK 12
 
 //PINOUT I2S CARD (AUDIO 3W)
-#define I2S_DOUT 35
-#define I2S_BCLK 36
-#define I2S_LRC 37
+#define I2S_DOUT 35  //35:protoV1  45:protoV2
+#define I2S_BCLK 36  //36:protoV1  48:protoV2
+#define I2S_LRC 37   //37:protoV1  46:protoV2
 #define I2S_GAIN 39
 #define PIN_ENABLE_I2S 42  //41:dev board  42:protov1
 
@@ -65,7 +71,7 @@
 
 //button PLAY (used as gain audio)
 #define PIN_BUTTON_PLAY 18
-#define PIN_BUTTON_NEXT 8
+#define PIN_BUTTON_NEXT 8    //18:dev board  8:protov1
 
 //use for turn off red light indicator after 10s
 #define TIME_PICTURE_END 10000  //milliseconds (10s)
@@ -81,14 +87,14 @@
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
 
 //neopixel
-#define PIN_ENABLE_NEOPIXEL 41  //not exit on dev board only protov1
+#define PIN_ENABLE_NEOPIXEL 41  //40:dev board  41:protov1 not exit on dev board only protov1
 
 //ADC boutton switch rotatif
 #define PIN_SWITCH_THEME 2
 #define PIN_SWITCH_USER 1
 
 //BATTERY VOLTAGE
-#define PIN_BAT_MEAS 14
+#define PIN_BAT_MEAS 14    //not use in dev board
 
 //CHARGE BATTERY STATUS
 #define PIN_CHARGE_STATUS 9
@@ -113,12 +119,12 @@ Audio audio;
 String ssid = "*****************";
 String password = "**********************";
 
-#define WIFI_ACTIVE 1       //default 1  update RTC on NTP server
+#define WIFI_ACTIVE 0       //default 1  update RTC on NTP server
 #define TEST_GAIN_VOLUME 0  //default 0
 #define TEST_LED 0          //default 0  1:test led
 #define LAMPE_NB_COLOR 1    //default 1  20:mix cobinaison couleur  top/bottom
-#define AUDIO_ACTIVE 1      //default 1
-#define RTC_ACTIVE 1        //default 1
+#define AUDIO_ACTIVE 1      //default 1 (0:PSRAM access)
+#define RTC_ACTIVE 0        //default 1
 
 int int_test_volume = 0;
 int int_test_led = 50;
@@ -179,8 +185,7 @@ int chargeStatus = 0;
 #define CLOCK_PIN 13  //not use
 
 //fastled pot
-#define NUM_LEDS2 4
-#define DATA_PIN2 38
+#define NUM_LEDS2 4     ////1: dev board 4:protov1
 
 // Define the array of leds
 CRGB leds[NUM_LEDS];
@@ -702,7 +707,17 @@ void setup() {
   }
 
   //memoire PSRAM
-  Serial.println((String) "Memoire disponible dans la PSRAM : " + ESP.getFreePsram());
+  //Initialisation PSRAM
+  if (psramInit()) {
+    Serial.println("PSRAM init pass");
+  } else {
+    Serial.println("PSRAM fail");
+  }
+
+  Serial.print("Memoire disponible PSRAM : ");
+  Serial.println( ESP.getFreePsram());
+
+  delay(10);
 
   //wifi
   if (WIFI_ACTIVE == 1) {
@@ -717,7 +732,7 @@ void setup() {
       intWifiConnectRetry++;
       Serial.print(".");
       delay(100);
-      if (intWifiConnectRetry >= 200) break;
+      if (intWifiConnectRetry >= 50) break;
     }
 
     if (intWifiConnectRetry >= 20) {
@@ -820,8 +835,7 @@ void setup() {
 
   ulong_time_picture = millis() + TIME_PICTURE_END;
 
-  //gain audio
-
+  //gain audio on boot
   Serial.println("gain:3dB");  //GAIN_SLOT=Pull-up 3.3V -> 3 dB
   pinMode(I2S_GAIN, INPUT_PULLUP);
 
@@ -909,12 +923,16 @@ void loop() {
 
     // switch theme
     analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
+    analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
+    analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
     //    Serial.printf("Switch theme = %d\n", analogSwitchTheme);
     //    analogSwitchTheme = analogReadMilliVolts(PIN_SWITCH_THEME);
     //Serial.printf("ADC mV theme = %d\n", analogSwitchTheme);
     //Serial.printf("%d,", analogSwitchTheme);
 
     // switch user
+    analogSwitchuser = analogRead(PIN_SWITCH_USER);
+    analogSwitchuser = analogRead(PIN_SWITCH_USER);
     analogSwitchuser = analogRead(PIN_SWITCH_USER);
     //    Serial.printf("Switch user = %d\n", analogSwitchuser);
     //    analogSwitchuser = analogReadMilliVolts(PIN_SWITCH_USER);
