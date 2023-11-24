@@ -50,14 +50,14 @@
 
 // PINOUT SD CARD
 #define SD_CS 10
-#define SPI_MOSI 11  // SD Card
+#define SPI_MOSI 11
 #define SPI_MISO 13
 #define SPI_SCK 12
 
 //PINOUT I2S CARD (AUDIO 3W)
-#define I2S_DOUT 35  //35:protoV1  45:protoV2
-#define I2S_BCLK 36  //36:protoV1  48:protoV2
-#define I2S_LRC 37   //37:protoV1  46:protoV2
+#define I2S_DOUT 45  //35:protoV1  45:protoV2
+#define I2S_BCLK 48  //36:protoV1  48:protoV2
+#define I2S_LRC 46   //37:protoV1  46:protoV2
 #define I2S_GAIN 39
 #define PIN_ENABLE_I2S 42  //41:dev board  42:protov1
 
@@ -71,20 +71,29 @@
 
 //button PLAY (used as gain audio)
 #define PIN_BUTTON_PLAY 18
-#define PIN_BUTTON_NEXT 8    //18:dev board  8:protov1
+#define PIN_BUTTON_NEXT 8  //18:dev board  8:protov1
 
 //use for turn off red light indicator after 10s
 #define TIME_PICTURE_END 10000  //milliseconds (10s)
 
-#define ROTARY_ENCODER_A_PIN 5
-#define ROTARY_ENCODER_B_PIN 6
-#define ROTARY_ENCODER_BUTTON_PIN 7
-#define ROTARY_ENCODER_VCC_PIN 17
-#define ROTARY_ENCODER_STEPS 4
-#define CYCLE_ROT 8  //9-1  //24 ref bourns PEC11R-4015F-S0024 (RS:737-7739)
+//rotary encoder not exist on the version 2.0
+// #define ROTARY_ENCODER_A_PIN 5
+// #define ROTARY_ENCODER_B_PIN 6
+// #define ROTARY_ENCODER_BUTTON_PIN 7
+// #define ROTARY_ENCODER_VCC_PIN 17
+// #define ROTARY_ENCODER_STEPS 4
+// #define CYCLE_ROT 8  //9-1  //24 ref bourns PEC11R-4015F-S0024 (RS:737-7739)
 
 //instead of changing here, rather change numbers above
-AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
+//AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
+
+//potentiometre emotions
+#define PIN_INT_SW9 5
+#define PIN_RESET_SW9 3         //RESET: LOW  ACTIVE DEVICE:HIGH
+#define PI4IOE5V9539_ADDR 0x74  //0x74 0xE8  // Adresse I2C du PI4IOE5V9539
+#define PIN_POWER_SW9 40
+#define PIN_POWER_BOARD_SWITCH_LIGHT 7
+
 
 //neopixel
 #define PIN_ENABLE_NEOPIXEL 41  //40:dev board  41:protov1 not exit on dev board only protov1
@@ -95,6 +104,7 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 
 //BATTERY VOLTAGE
 #define PIN_BAT_MEAS 14    //not use in dev board
+#define PIN_BAT_MEAS_EN 6  //new on versin 2.0
 
 //CHARGE BATTERY STATUS
 #define PIN_CHARGE_STATUS 9
@@ -125,6 +135,7 @@ String password = "**********************";
 #define LAMPE_NB_COLOR 1    //default 1  20:mix cobinaison couleur  top/bottom
 #define AUDIO_ACTIVE 1      //default 1 (0:PSRAM access)
 #define RTC_ACTIVE 0        //default 1
+#define DEBUG_UART 1        //default 0
 
 int int_test_volume = 0;
 int int_test_led = 50;
@@ -165,6 +176,10 @@ unsigned long longPressButton = 1500;  // long time pressure button
 
 int nextSong = 0;
 
+//switch emotion 9 postiions
+int intDetectExpIoSw9 = 0;
+int intCmptRotSw9 = 0;
+
 //adc
 int analogSwitchTheme = 0;
 int analogSwitchuser = 0;
@@ -180,15 +195,15 @@ int chargeStatus = 0;
 //fastled
 #define NUM_LEDS 9
 #define BRIGHTNESS 200
-#define DATA_PIN 40
-#define DATA_PIN2 38
+#define DATA_PIN 21
+#define DATA_PIN2 21
 #define CLOCK_PIN 13  //not use
 
 //fastled pot
-#define NUM_LEDS2 4     ////1: dev board 4:protov1
+#define NUM_LEDS2 4  ////1: dev board 4:protov1
 
 // Define the array of leds
-CRGB leds[NUM_LEDS];
+//CRGB leds[NUM_LEDS];  //not presnet board 2.0
 CRGB leds2[NUM_LEDS2];
 
 CRGB couleur = CRGB(0, 0, 0);
@@ -238,6 +253,107 @@ void set_tick_tock(void) {
 
 
 
+void readLightButton() {
+  //pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
+  //digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
+
+  //disable LDO
+
+  //pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+  //digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
+}
+
+
+
+
+void readSwitchEmo(int bypassInt) {
+  byte error;
+  byte inputPort0 = 0;
+  byte inputPort1 = 0;
+
+  //detect if interrupt active
+  if (bypassInt == 1) {
+    //read directly
+    Serial.print("int SW9:");
+    Serial.println(intCmptRotSw9);
+
+    //read expander io
+    Wire.beginTransmission(PI4IOE5V9539_ADDR);
+    Wire.write(0x00);  // Registre INPUT port0
+    Wire.endTransmission(false);
+
+    Wire.requestFrom(PI4IOE5V9539_ADDR, 1);
+    if (Wire.available()) {
+      inputPort0 = Wire.read();
+
+      // Afficher l'état du port 0
+      Serial.print("État PORT 0 : ");
+      Serial.println(inputPort0, BIN);
+    }
+
+    Wire.requestFrom(PI4IOE5V9539_ADDR, 1);
+    if (Wire.available()) {
+      inputPort1 = Wire.read();
+
+      // Afficher l'état du port 1
+      Serial.print("État PORT 1 : ");
+      Serial.println(inputPort1, BIN);
+    }
+
+  } else {
+    //read if int occur
+    if (intDetectExpIoSw9 == 1) {
+      intDetectExpIoSw9 = 0;
+      delay(2);
+      attachInterrupt(digitalPinToInterrupt(PIN_INT_SW9), intExpIoSw9, FALLING);
+
+
+      Serial.print("int SW9:");
+      Serial.println(intCmptRotSw9);
+
+      //read expander io
+      Wire.beginTransmission(PI4IOE5V9539_ADDR);
+      error = Wire.endTransmission();
+      if (error == 0) {
+        Serial.println("error I2C expander");
+      } else {
+        //expander detect
+        Serial.println("expander present");
+
+        Wire.write(0x00);  // Registre INPUT port0
+        error = Wire.endTransmission();
+        if (error == 0) {
+          Serial.println("error I2C expander write");
+        }
+
+        Wire.requestFrom(PI4IOE5V9539_ADDR, 1);
+        // if (Wire.available()) {
+        inputPort0 = Wire.read();
+        // Afficher l'état du port 0
+        Serial.print("État PORT 0 : ");
+        Serial.println(inputPort0, BIN);
+        // } else {
+        //   Serial.println("problem read PORT 0");
+        // }
+
+        Wire.requestFrom(PI4IOE5V9539_ADDR, 1);
+        // if (Wire.available()) {
+        inputPort1 = Wire.read();
+
+        // Afficher l'état du port 1
+        Serial.print("État PORT 1 : ");
+        Serial.println(inputPort1, BIN);
+        // } else {
+        //   Serial.println("problem read PORT 1");
+        // }
+      }
+    }
+  }
+}
+
+
+
+/*
 void rotary_onButtonClick() {
   static unsigned long lastTimePressed = 0;
   //ignore multiple press in that time milliseconds
@@ -323,6 +439,7 @@ void IRAM_ATTR readEncoderISR() {
   rotaryEncoder.readEncoder_ISR();
 }
 
+*/
 
 
 void initSDCard() {
@@ -641,6 +758,8 @@ void printLocalTime() {
 //}
 
 
+
+//INTERRUPT jack audio inserted
 void jackChangeInterrupt() {
   jackInsertedCnt++;
   jackInserted = 0;
@@ -649,8 +768,21 @@ void jackChangeInterrupt() {
 }
 
 
+//INTERRUPT expander io switch 9 positions
+void intExpIoSw9() {
+  intCmptRotSw9++;
+  intDetectExpIoSw9 = 1;
+  detachInterrupt(digitalPinToInterrupt(PIN_INT_SW9));
+}
+
+
 void setup() {
-  //delay(1000);
+
+  //auto maintain power of the board when start
+  //DO activate when R22 100K remove
+  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+  digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
+  delay(1000);
 
   //  HWSerial.begin(2000000);
   //  HWSerial.setDebugOutput(true);
@@ -690,6 +822,14 @@ void setup() {
     }
   }
 
+
+
+  //INIT batterie read voltage pin
+  pinMode(PIN_BAT_MEAS_EN, OUTPUT);
+  digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
+
+
+
   //sd card
   if (AUDIO_ACTIVE == 1) {
     pinMode(SD_CS, OUTPUT);
@@ -715,7 +855,7 @@ void setup() {
   }
 
   Serial.print("Memoire disponible PSRAM : ");
-  Serial.println( ESP.getFreePsram());
+  Serial.println(ESP.getFreePsram());
 
   delay(10);
 
@@ -786,8 +926,8 @@ void setup() {
   pinMode(PIN_ENABLE_NEOPIXEL, OUTPUT);
   digitalWrite(PIN_ENABLE_NEOPIXEL, LOW);  //HIGH:led off LOW:led on
 
-  //9 leds
-  FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
+  //9 leds thhis board not present ver 2.0
+  //FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
 
   //4 leds
   FastLED.addLeds<NEOPIXEL, DATA_PIN2>(leds2, NUM_LEDS2);  // GRB ordering is assumed
@@ -796,9 +936,9 @@ void setup() {
 
   //start animation
   for (i = 0; i < NUM_LEDS; i++) {
-    leds[i % 3] = CRGB(0, 0, 150);
-    leds[i % 3 + 3] = CRGB(70, 70, 70);
-    leds[i % 3 + 6] = CRGB(200, 0, 0);
+    leds2[i % 3] = CRGB(0, 0, 150);
+    leds2[i % 3 + 3] = CRGB(70, 70, 70);
+    leds2[i % 3 + 6] = CRGB(200, 0, 0);
     delay(200);
     FastLED.show();
   }
@@ -806,32 +946,33 @@ void setup() {
   delay(1000);
 
   for (i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB(0, 0, 0);
+    leds2[i] = CRGB(0, 0, 0);
   }
   FastLED.show();
 
-  Serial.println("init rotary");
-  pinMode(ROTARY_ENCODER_A_PIN, INPUT_PULLUP);
-  pinMode(ROTARY_ENCODER_B_PIN, INPUT_PULLUP);
-  pinMode(ROTARY_ENCODER_BUTTON_PIN, INPUT_PULLUP);
+  //not present on v2.0
+  // Serial.println("init rotary");
+  // pinMode(ROTARY_ENCODER_A_PIN, INPUT_PULLUP);
+  // pinMode(ROTARY_ENCODER_B_PIN, INPUT_PULLUP);
+  // pinMode(ROTARY_ENCODER_BUTTON_PIN, INPUT_PULLUP);
 
-  //we must initialize rotary encoder
-  rotaryEncoder.begin();
-  rotaryEncoder.setup(readEncoderISR);
-  //set boundaries and if values should cycle or not
-  //in this example we will set possible values between 0 and 1000;
-  bool circleValues = true;
-  rotaryEncoder.setBoundaries(0, CYCLE_ROT, circleValues);  //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
+  // //we must initialize rotary encoder
+  // rotaryEncoder.begin();
+  // rotaryEncoder.setup(readEncoderISR);
+  // //set boundaries and if values should cycle or not
+  // //in this example we will set possible values between 0 and 1000;
+  // bool circleValues = true;
+  // rotaryEncoder.setBoundaries(0, CYCLE_ROT, circleValues);  //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
 
-  /*Rotary acceleration introduced 25.2.2021.
-     in case range to select is huge, for example - select a value between 0 and 1000 and we want 785
-     without accelerateion you need long time to get to that number
-     Using acceleration, faster you turn, faster wil
-     l the value raise.
-     For fine tuning slow down.
-  */
-  //rotaryEncoder.disableAcceleration(); //acceleration is now enabled by default - disable if you dont need it
-  rotaryEncoder.setAcceleration(1);  //250 or set the value - larger number = more accelearation; 0 or 1 means disabled acceleration
+  // /*Rotary acceleration introduced 25.2.2021.
+  //    in case range to select is huge, for example - select a value between 0 and 1000 and we want 785
+  //    without accelerateion you need long time to get to that number
+  //    Using acceleration, faster you turn, faster wil
+  //    l the value raise.
+  //    For fine tuning slow down.
+  // */
+  // //rotaryEncoder.disableAcceleration(); //acceleration is now enabled by default - disable if you dont need it
+  // rotaryEncoder.setAcceleration(1);  //250 or set the value - larger number = more accelearation; 0 or 1 means disabled acceleration
 
   ulong_time_picture = millis() + TIME_PICTURE_END;
 
@@ -855,12 +996,36 @@ void setup() {
 
   //audio web radio
   //enable AUDIO
+  if (DEBUG_UART == 1) {
+    // delay(2000);
+    Serial.println("Enable AUDIO");
+  }
   pinMode(PIN_ENABLE_I2S, INPUT);  // floatting left+right/2
+  //new board 2.0
+  //pinMode(PIN_ENABLE_I2S, OUTPUT);
+  //digitalWrite(PIN_ENABLE_I2S, HIGH);
 
+  if (DEBUG_UART == 1) {
+    // delay(2000);
+    Serial.println("active read AUDIO");
+  }
   if (AUDIO_ACTIVE == 1) {
+    Serial.println("set pinout");
     audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+    if (DEBUG_UART == 1) {
+      //delay(2000);
+      Serial.println("set balance");
+    }
     audio.setBalance(-16);  // mutes the left channel
+    if (DEBUG_UART == 1) {
+      //delay(2000);
+      Serial.println("set volume 0");
+    }
     audio.setVolume(0);
+    if (DEBUG_UART == 1) {
+      //delay(2000);
+      Serial.println("set mono true");
+    }
     audio.forceMono(true);  //mono application
 
     //stream music
@@ -868,25 +1033,72 @@ void setup() {
 
     //sd musique
     //audio.connecttoFS(SD, "/04/001.mp3");
+    if (DEBUG_UART == 1) {
+      //delay(2000);
+      Serial.println("audio connect mp3");
+    }
     audio.connecttoSD("/04/001.mp3");
+
+    if (DEBUG_UART == 1) {
+      //delay(2000);
+      Serial.println("pause");
+    }
     audio.pauseResume();
   }
 
+  if (DEBUG_UART == 1) {
+    //delay(2000);
+    Serial.println("buton play next");
+  }
+  //int button play next
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
   pinMode(PIN_BUTTON_NEXT, INPUT_PULLUP);
 
+
+  if (DEBUG_UART == 1) {
+    //delay(2000);
+    Serial.println("jack detect");
+  }
   //pullup jack detect
   pinMode(PIN_ADC_JACK_DETECT, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_ADC_JACK_DETECT), jackChangeInterrupt, CHANGE);
 
+  if (DEBUG_UART == 1) {
+    //delay(2000);
+    Serial.println("switch emotion");
+  }
+  //init pin switch 9 emotions
+  pinMode(PIN_RESET_SW9, OUTPUT);
+  digitalWrite(PIN_RESET_SW9, HIGH);  //high:enable expander low:disable expander (reset)
+  pinMode(PIN_POWER_SW9, OUTPUT);
+  digitalWrite(PIN_POWER_SW9, HIGH);  //high:power ON switch9 low:power OFF switch9
+  delay(1);
 
+  pinMode(PIN_INT_SW9, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PIN_INT_SW9), intExpIoSw9, FALLING);
+
+  if (DEBUG_UART == 1) {
+    //delay(2000);
+    Serial.println("wifi disconnect");
+  }
   //turn off wifi
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
 
+  if (DEBUG_UART == 1) {
+    //delay(2000);
+    Serial.println("read battery");
+  }
   //battery level
   for (i = 0; i < 16; i++) {
     readBatLevel();
+  }
+
+  if (DEBUG_UART == 1) {
+    //delay(2000);
+    Serial.println("exit setup -> loop");
+    // while (true)
+    //   ;
   }
 }
 
@@ -897,7 +1109,6 @@ void loop() {
   ulong_time_now = millis();
 
   //change gain depending jack inserted
-
   // if (jackInserted == 1) {
   //   //3dB casque
   //   pinMode(I2S_GAIN, OUTPUT);
@@ -967,7 +1178,15 @@ void loop() {
   }
 
   //in loop call your custom function which will process rotary encoder values
-  rotary_loop();
+  //not present on ver 2.0
+  //rotary_loop();
+
+  //read expander io
+  readSwitchEmo(0);
+
+  //read light button
+  readLightButton();
+
 
   //PART button play change power audio
   readButPlay = digitalRead(PIN_BUTTON_PLAY);
@@ -1092,12 +1311,12 @@ void loop() {
       }
 
       for (i = 0; i < NUM_LEDS; i++) {
-        leds[i] = CRGB::Black;
+        //not present V2.0  leds[i] = CRGB::Black;
       }
 
       for (i = 0; i < map(valVolume, 0, 21, 0, NUM_LEDS); i++) {
         couleur = CRGB(200, 0, 0);
-        leds[i] = couleur;  //rouge
+        //not present V2.0  leds[i] = couleur;  //rouge
       }
       FastLED.show();
 
@@ -1107,71 +1326,71 @@ void loop() {
       for (i = 0; i < NUM_LEDS2; i++) {
         if (flip_light >= 1) {
           //4 led lampe
-          switch (flip_light) {
-            case 1:
-              leds2[i] = CRGB(255, 255, 255);  //blanc
-              break;
-            case 2:
-              leds2[i] = CRGB(255, 255, 255);  //blanc
-              break;
-            case 3:
-              leds2[i] = CRGB(255, 255, 255);  //blanc
-              break;
-            case 4:
-              leds2[i] = CRGB(255, 255, 255);  //blanc
-              break;
-            case 5:
-              leds2[i] = CRGB(0, 255, 0);  //vert
-              break;
-            case 6:
-              leds2[i] = CRGB(0, 255, 0);  //vert
-              break;
-            case 7:
-              leds2[i] = CRGB(0, 255, 0);  //vert
-              break;
-            case 8:
-              leds2[i] = CRGB(0, 255, 0);  //vert
-              break;
-            case 9:
-              leds2[i] = CRGB(255, 0, 0);  //rouge
-              break;
-            case 10:
-              leds2[i] = CRGB(255, 0, 0);  //rouge
-              break;
-            case 11:
-              leds2[i] = CRGB(255, 0, 0);  //rouge
-              break;
-            case 12:
-              leds2[i] = CRGB(255, 0, 0);  //rouge
-              break;
-            case 13:
-              leds2[i] = CRGB(0, 0, 255);  //bleu
-              break;
-            case 14:
-              leds2[i] = CRGB(0, 0, 255);  //bleu
-              break;
-            case 15:
-              leds2[i] = CRGB(0, 0, 255);  //bleu
-              break;
-            case 16:
-              leds2[i] = CRGB(0, 0, 255);  //bleu
-              break;
-            case 17:
-              leds2[i] = CRGB(0, 0, 0);  //noir
-              break;
-            case 18:
-              leds2[i] = CRGB(0, 0, 0);  //noir
-              break;
-            case 19:
-              leds2[i] = CRGB(0, 0, 0);  //noir
-              break;
-            case 20:
-              leds2[i] = CRGB(0, 0, 0);  //noir
-              break;
-            default:
-              leds2[i] = CRGB(255, 255, 255);  //blanc
-              break;
-          }
+          // switch (flip_light) {
+          //   case 1:
+          //     leds2[i] = CRGB(255, 255, 255);  //blanc
+          //     break;
+          //   case 2:
+          //     leds2[i] = CRGB(255, 255, 255);  //blanc
+          //     break;
+          //   case 3:
+          //     leds2[i] = CRGB(255, 255, 255);  //blanc
+          //     break;
+          //   case 4:
+          //     leds2[i] = CRGB(255, 255, 255);  //blanc
+          //     break;
+          //   case 5:
+          //     leds2[i] = CRGB(0, 255, 0);  //vert
+          //     break;
+          //   case 6:
+          //     leds2[i] = CRGB(0, 255, 0);  //vert
+          //     break;
+          //   case 7:
+          //     leds2[i] = CRGB(0, 255, 0);  //vert
+          //     break;
+          //   case 8:
+          //     leds2[i] = CRGB(0, 255, 0);  //vert
+          //     break;
+          //   case 9:
+          //     leds2[i] = CRGB(255, 0, 0);  //rouge
+          //     break;
+          //   case 10:
+          //     leds2[i] = CRGB(255, 0, 0);  //rouge
+          //     break;
+          //   case 11:
+          //     leds2[i] = CRGB(255, 0, 0);  //rouge
+          //     break;
+          //   case 12:
+          //     leds2[i] = CRGB(255, 0, 0);  //rouge
+          //     break;
+          //   case 13:
+          //     leds2[i] = CRGB(0, 0, 255);  //bleu
+          //     break;
+          //   case 14:
+          //     leds2[i] = CRGB(0, 0, 255);  //bleu
+          //     break;
+          //   case 15:
+          //     leds2[i] = CRGB(0, 0, 255);  //bleu
+          //     break;
+          //   case 16:
+          //     leds2[i] = CRGB(0, 0, 255);  //bleu
+          //     break;
+          //   case 17:
+          //     leds2[i] = CRGB(0, 0, 0);  //noir
+          //     break;
+          //   case 18:
+          //     leds2[i] = CRGB(0, 0, 0);  //noir
+          //     break;
+          //   case 19:
+          //     leds2[i] = CRGB(0, 0, 0);  //noir
+          //     break;
+          //   case 20:
+          //     leds2[i] = CRGB(0, 0, 0);  //noir
+          //     break;
+          //   default:
+          //     leds2[i] = CRGB(255, 255, 255);  //blanc
+          //     break;
+          // }
 
 
         } else {
@@ -1180,7 +1399,7 @@ void loop() {
       }
 
       for (i = 0; i < NUM_LEDS; i++) {
-        leds[i] = CRGB::Black;
+        //not present V2.0  i] = CRGB::Black;
       }
 
       if (ulong_time_now >= ulong_time_picture) {
@@ -1194,67 +1413,67 @@ void loop() {
         //leds[numero_led] = CRGB::Red;
         switch (flip_light) {
           case 1:
-            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
           case 2:
-            leds[numero_led] = CRGB(0, 255, 0);  //vert
+            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
             break;
           case 3:
-            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
             break;
           case 4:
-            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
             break;
           case 5:
-            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
           case 6:
-            leds[numero_led] = CRGB(0, 255, 0);  //vert
+            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
             break;
           case 7:
-            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
             break;
           case 8:
-            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
             break;
           case 9:
-            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
           case 10:
-            leds[numero_led] = CRGB(0, 255, 0);  //vert
+            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
             break;
           case 11:
-            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
             break;
           case 12:
-            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
             break;
           case 13:
-            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
           case 14:
-            leds[numero_led] = CRGB(0, 255, 0);  //vert
+            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
             break;
           case 15:
-            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
             break;
           case 16:
-            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
             break;
           case 17:
-            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
           case 18:
-            leds[numero_led] = CRGB(0, 255, 0);  //vert
+            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
             break;
           case 19:
-            leds[numero_led] = CRGB(0, 0, 255);  //bleu
+            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
             break;
           case 20:
-            leds[numero_led] = CRGB(255, 255, 255);  //blanc
+            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
             break;
           default:
-            leds[numero_led] = CRGB(255, 0, 0);  //rouge
+            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
             break;
         }
       }
@@ -1354,6 +1573,7 @@ void change_song(void) {
 
 
 void logUart(void) {
+  //adc theme  |  ADC user | jack cnt  | status jack insert | batterie voltage | charge status | PSRAM
   if (millis() > updateLogUart) {
     updateLogUart = millis() + PERIOD_LOG_UART;
 
@@ -1371,12 +1591,19 @@ void logUart(void) {
 
 
 void readBatLevel(void) {
+  //enable read battery
+  digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
+  //delay(1);
+
   //Battery voltage adc@3.1V
   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+
+  //disable read bat
+  //digitalWrite(PIN_BAT_MEAS_EN, LOW);  //HIGH:read bat off LOW:read bat on
 
   indiceBatVoltage++;
   sumBatVoltage = (sumBatVoltage - matAnalogBatVoltage[indiceBatVoltage % 16]);
