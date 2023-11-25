@@ -5,7 +5,6 @@
   librairies
   - audio I2S : https://github.com/schreibfaul1/ESP32-audioI2S.git
   - neopixel  : https://github.com/FastLED/FastLED.git
-  - rotary encoder : https://github.com/igorantolic/ai-esp32-rotary-encoder.git1
   - RTC PCF8563 : https://github.com/adafruit/RTClib.git
   - cryto : https://github.com/rweather/arduinolibs.git
 
@@ -38,7 +37,6 @@
 #include <WiFi.h>
 #include <Audio.h>
 #include <FastLED.h>
-#include <AiEsp32RotaryEncoder.h>
 #include "SD.h"
 #include "FS.h"
 #include "SPIFFS.h"
@@ -76,16 +74,11 @@
 //use for turn off red light indicator after 10s
 #define TIME_PICTURE_END 10000  //milliseconds (10s)
 
-//rotary encoder not exist on the version 2.0
-// #define ROTARY_ENCODER_A_PIN 5
-// #define ROTARY_ENCODER_B_PIN 6
-// #define ROTARY_ENCODER_BUTTON_PIN 7
-// #define ROTARY_ENCODER_VCC_PIN 17
-// #define ROTARY_ENCODER_STEPS 4
-// #define CYCLE_ROT 8  //9-1  //24 ref bourns PEC11R-4015F-S0024 (RS:737-7739)
+//timeout read I2C
+#define TIMEOUT_I2C_READ 500  //500ms
 
-//instead of changing here, rather change numbers above
-//AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
+//TIME long press button light
+#define LONG_PRESS 4000  //4 secondes
 
 //potentiometre emotions
 #define PIN_INT_SW9 5
@@ -93,7 +86,6 @@
 #define PI4IOE5V9539_ADDR 0x74  //0x74 0xE8  // Adresse I2C du PI4IOE5V9539
 #define PIN_POWER_SW9 40
 #define PIN_POWER_BOARD_SWITCH_LIGHT 7
-
 
 //neopixel
 #define PIN_ENABLE_NEOPIXEL 41  //40:dev board  41:protov1 not exit on dev board only protov1
@@ -140,8 +132,18 @@ String password = "**********************";
 int int_test_volume = 0;
 int int_test_led = 50;
 
+
+
+/*
+__________                                     __                       
+\______   \_____ ____________    _____   _____/  |_  ___________  ______
+ |     ___/\__  \\_  __ \__  \  /     \_/ __ \   __\/ __ \_  __ \/  ___/
+ |    |     / __ \|  | \// __ \|  Y Y  \  ___/|  | \  ___/|  | \/\___ \ 
+ |____|    (____  /__|  (____  /__|_|  /\___  >__|  \___  >__|  /____  >
+                \/           \/      \/     \/          \/           \/ 
 //PARAMETERS
-//--------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------
+*/
 
 long int valVolume = 0;
 long int valVolumeold = 0;
@@ -156,6 +158,7 @@ unsigned long updateTimeHorloge = 0;
 unsigned long updateAdcRead = 0;
 unsigned long updateLogUart = 0;
 unsigned long CheckTimeJackInserted = 0;
+unsigned long timeoutPressButtonLight = 0;
 
 int i = 0;  //for
 
@@ -179,6 +182,13 @@ int nextSong = 0;
 //switch emotion 9 postiions
 int intDetectExpIoSw9 = 0;
 int intCmptRotSw9 = 0;
+int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
+
+
+//button light
+int buttonlightLevel = 0;
+int oldButtonlightLevel = 0;
+
 
 //adc
 int analogSwitchTheme = 0;
@@ -210,12 +220,14 @@ CRGB couleur = CRGB(0, 0, 0);
 
 int numero_led = 0;
 int flip_light = 0;
+int flipLight = 0;
 unsigned long ulong_time_now = 0;
 unsigned long ulong_time_picture = 0;  //TIME_PICTURE_END
 
 //files
 int intNbAudioFileInDir = 0;
 int intNumeroDossier = 9;
+int intOldNumeroDossier = 0;
 int intNombreDossier = 9;
 
 char name_directory[100] = "/09";
@@ -240,116 +252,29 @@ volatile uint8_t tick_tock = 1;
 
 
 
-//fonction declaration
+/*
+___________                   __  .__                      
+\_   _____/_ __  ____   _____/  |_|__| ____   ____   ______
+ |    __)|  |  \/    \_/ ___\   __\  |/  _ \ /    \ /  ___/
+ |     \ |  |  /   |  \  \___|  | |  (  <_> )   |  \\___ \ 
+ \___  / |____/|___|  /\___  >__| |__|\____/|___|  /____  >
+     \/             \/     \/                    \/     \/ 
+//functions declaration
+--------------------------------------------------------------------------------------------
+*/
 void change_song(void);
 void logUart(void);
 void readBatLevel(void);
+void set_tick_tock(void);
+void powerOffLed(void);
+void powerOnLed(void);
+void fadeOutLed(void);
+void fadeInLed(void);
+void activeLed(int red, int green, int blue, int active);
+int readLightButton(void);
+int readSwitchEmo(int bypassInt);
+void changeDirEmotion(int intDirEmotion);
 
-
-// INT0 interrupt callback; update tick_tock flag
-void set_tick_tock(void) {
-  tick_tock = 1;
-}
-
-
-
-void readLightButton() {
-  //pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
-  //digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
-
-  //disable LDO
-
-  //pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
-  //digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
-}
-
-
-
-
-void readSwitchEmo(int bypassInt) {
-  byte error;
-  byte inputPort0 = 0;
-  byte inputPort1 = 0;
-
-  //detect if interrupt active
-  if (bypassInt == 1) {
-    //read directly
-    Serial.print("int SW9:");
-    Serial.println(intCmptRotSw9);
-
-    //read expander io
-    Wire.beginTransmission(PI4IOE5V9539_ADDR);
-    Wire.write(0x00);  // Registre INPUT port0
-    Wire.endTransmission(false);
-
-    Wire.requestFrom(PI4IOE5V9539_ADDR, 1);
-    if (Wire.available()) {
-      inputPort0 = Wire.read();
-
-      // Afficher l'état du port 0
-      Serial.print("État PORT 0 : ");
-      Serial.println(inputPort0, BIN);
-    }
-
-    Wire.requestFrom(PI4IOE5V9539_ADDR, 1);
-    if (Wire.available()) {
-      inputPort1 = Wire.read();
-
-      // Afficher l'état du port 1
-      Serial.print("État PORT 1 : ");
-      Serial.println(inputPort1, BIN);
-    }
-
-  } else {
-    //read if int occur
-    if (intDetectExpIoSw9 == 1) {
-      intDetectExpIoSw9 = 0;
-      delay(2);
-      attachInterrupt(digitalPinToInterrupt(PIN_INT_SW9), intExpIoSw9, FALLING);
-
-
-      Serial.print("int SW9:");
-      Serial.println(intCmptRotSw9);
-
-      //read expander io
-      Wire.beginTransmission(PI4IOE5V9539_ADDR);
-      error = Wire.endTransmission();
-      if (error == 0) {
-        Serial.println("error I2C expander");
-      } else {
-        //expander detect
-        Serial.println("expander present");
-
-        Wire.write(0x00);  // Registre INPUT port0
-        error = Wire.endTransmission();
-        if (error == 0) {
-          Serial.println("error I2C expander write");
-        }
-
-        Wire.requestFrom(PI4IOE5V9539_ADDR, 1);
-        // if (Wire.available()) {
-        inputPort0 = Wire.read();
-        // Afficher l'état du port 0
-        Serial.print("État PORT 0 : ");
-        Serial.println(inputPort0, BIN);
-        // } else {
-        //   Serial.println("problem read PORT 0");
-        // }
-
-        Wire.requestFrom(PI4IOE5V9539_ADDR, 1);
-        // if (Wire.available()) {
-        inputPort1 = Wire.read();
-
-        // Afficher l'état du port 1
-        Serial.print("État PORT 1 : ");
-        Serial.println(inputPort1, BIN);
-        // } else {
-        //   Serial.println("problem read PORT 1");
-        // }
-      }
-    }
-  }
-}
 
 
 
@@ -805,11 +730,13 @@ void setup() {
   //set the resolution to 12 bits (0-4096)
   analogReadResolution(12);
 
+  //I2C expanderIO and RTC
+  Wire.begin(SDA_PIN_RTC_PCF8563, SCL_PIN_RTC_PCF8563);  //SDA SCL
+
   //I2C RTC
   if (RTC_ACTIVE == 1) {
-    Wire.begin(SDA_PIN_RTC_PCF8563, SCL_PIN_RTC_PCF8563);  //SDA SCL
-    pinMode(IRQ_PIN_RTC_PCF8563, INPUT);                   // set up interrupt pin
-    digitalWrite(IRQ_PIN_RTC_PCF8563, HIGH);               // turn on pullup resistors
+    pinMode(IRQ_PIN_RTC_PCF8563, INPUT);      // set up interrupt pin
+    digitalWrite(IRQ_PIN_RTC_PCF8563, HIGH);  // turn on pullup resistors
     // attach interrupt to set_tick_tock callback on rising edge of INT0
     attachInterrupt(digitalPinToInterrupt(IRQ_PIN_RTC_PCF8563), set_tick_tock, RISING);
 
@@ -923,32 +850,14 @@ void setup() {
   Serial.println("init neopixel");
 
   //power supply led neopixel
-  pinMode(PIN_ENABLE_NEOPIXEL, OUTPUT);
-  digitalWrite(PIN_ENABLE_NEOPIXEL, LOW);  //HIGH:led off LOW:led on
+  powerOnLed();
 
-  //9 leds thhis board not present ver 2.0
-  //FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
-
-  //4 leds
+  //init 4 leds
   FastLED.addLeds<NEOPIXEL, DATA_PIN2>(leds2, NUM_LEDS2);  // GRB ordering is assumed
-
   FastLED.setBrightness(BRIGHTNESS);
 
   //start animation
-  for (i = 0; i < NUM_LEDS; i++) {
-    leds2[i % 3] = CRGB(0, 0, 150);
-    leds2[i % 3 + 3] = CRGB(70, 70, 70);
-    leds2[i % 3 + 6] = CRGB(200, 0, 0);
-    delay(200);
-    FastLED.show();
-  }
-
-  delay(1000);
-
-  for (i = 0; i < NUM_LEDS; i++) {
-    leds2[i] = CRGB(0, 0, 0);
-  }
-  FastLED.show();
+  fadeInLed();
 
   //not present on v2.0
   // Serial.println("init rotary");
@@ -1074,6 +983,7 @@ void setup() {
   digitalWrite(PIN_POWER_SW9, HIGH);  //high:power ON switch9 low:power OFF switch9
   delay(1);
 
+  //interrupt expander IO SW9
   pinMode(PIN_INT_SW9, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_INT_SW9), intExpIoSw9, FALLING);
 
@@ -1100,6 +1010,9 @@ void setup() {
     // while (true)
     //   ;
   }
+
+  //init switch 9 pos emotion
+  intNumeroDossier = readSwitchEmo(1);  //1 direct read  0:wait interrupt for reading
 }
 
 
@@ -1181,11 +1094,46 @@ void loop() {
   //not present on ver 2.0
   //rotary_loop();
 
-  //read expander io
-  readSwitchEmo(0);
+  //read switch 9 pos emotion
+  intNumeroDossier = readSwitchEmo(0);  //1 direct read  0:wait interrupt for reading
+  if (intNumeroDossier != intOldNumeroDossier) {
+    intOldNumeroDossier = intNumeroDossier;
+    changeDirEmotion(intNumeroDossier);
+  }
 
-  //read light button
-  readLightButton();
+
+  //read button light on pwer ohh if long press
+  buttonlightLevel = readLightButton();
+
+  if (buttonlightLevel != oldButtonlightLevel) {
+
+    if (oldButtonlightLevel == 0 && buttonlightLevel == 1) {
+      flipLight = flipLight ^ 1;
+      if (flipLight == 1)
+        activeLed(0, 150, 0, 1);  // red,  green,  blue,  active
+      else
+        activeLed(0, 0, 0, 0);  // red,  green,  blue,  active
+      Serial.println(buttonlightLevel);
+    } else {
+      Serial.println(buttonlightLevel);
+    }
+
+    oldButtonlightLevel = buttonlightLevel;
+
+    if (oldButtonlightLevel == 2) {
+      //power off
+      fadeOutLed();
+
+      Serial.println("POWER OFF");
+      for (int ii = 10; ii >= 0; ii--) {
+        Serial.println(ii);
+        delay(1000);
+      }
+      Serial.println("OFF");
+      pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+      digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+    }
+  }
 
 
   //PART button play change power audio
@@ -1310,182 +1258,15 @@ void loop() {
         audio.setVolume(valVolume);  // 0...21
       }
 
-      for (i = 0; i < NUM_LEDS; i++) {
-        //not present V2.0  leds[i] = CRGB::Black;
-      }
-
-      for (i = 0; i < map(valVolume, 0, 21, 0, NUM_LEDS); i++) {
-        couleur = CRGB(200, 0, 0);
-        //not present V2.0  leds[i] = couleur;  //rouge
-      }
-      FastLED.show();
-
     } else {
-      //Serial.println(updatevolume);
-      //init all led with OFF or ON
-      for (i = 0; i < NUM_LEDS2; i++) {
-        if (flip_light >= 1) {
-          //4 led lampe
-          // switch (flip_light) {
-          //   case 1:
-          //     leds2[i] = CRGB(255, 255, 255);  //blanc
-          //     break;
-          //   case 2:
-          //     leds2[i] = CRGB(255, 255, 255);  //blanc
-          //     break;
-          //   case 3:
-          //     leds2[i] = CRGB(255, 255, 255);  //blanc
-          //     break;
-          //   case 4:
-          //     leds2[i] = CRGB(255, 255, 255);  //blanc
-          //     break;
-          //   case 5:
-          //     leds2[i] = CRGB(0, 255, 0);  //vert
-          //     break;
-          //   case 6:
-          //     leds2[i] = CRGB(0, 255, 0);  //vert
-          //     break;
-          //   case 7:
-          //     leds2[i] = CRGB(0, 255, 0);  //vert
-          //     break;
-          //   case 8:
-          //     leds2[i] = CRGB(0, 255, 0);  //vert
-          //     break;
-          //   case 9:
-          //     leds2[i] = CRGB(255, 0, 0);  //rouge
-          //     break;
-          //   case 10:
-          //     leds2[i] = CRGB(255, 0, 0);  //rouge
-          //     break;
-          //   case 11:
-          //     leds2[i] = CRGB(255, 0, 0);  //rouge
-          //     break;
-          //   case 12:
-          //     leds2[i] = CRGB(255, 0, 0);  //rouge
-          //     break;
-          //   case 13:
-          //     leds2[i] = CRGB(0, 0, 255);  //bleu
-          //     break;
-          //   case 14:
-          //     leds2[i] = CRGB(0, 0, 255);  //bleu
-          //     break;
-          //   case 15:
-          //     leds2[i] = CRGB(0, 0, 255);  //bleu
-          //     break;
-          //   case 16:
-          //     leds2[i] = CRGB(0, 0, 255);  //bleu
-          //     break;
-          //   case 17:
-          //     leds2[i] = CRGB(0, 0, 0);  //noir
-          //     break;
-          //   case 18:
-          //     leds2[i] = CRGB(0, 0, 0);  //noir
-          //     break;
-          //   case 19:
-          //     leds2[i] = CRGB(0, 0, 0);  //noir
-          //     break;
-          //   case 20:
-          //     leds2[i] = CRGB(0, 0, 0);  //noir
-          //     break;
-          //   default:
-          //     leds2[i] = CRGB(255, 255, 255);  //blanc
-          //     break;
-          // }
-
-
-        } else {
-          leds2[i] = CRGB::Black;
-        }
-      }
-
-      for (i = 0; i < NUM_LEDS; i++) {
-        //not present V2.0  i] = CRGB::Black;
-      }
-
-      if (ulong_time_now >= ulong_time_picture) {
-        // if (flip_light == 1) {
-        //   leds[numero_led] = CRGB::White;
-        // } else {
-        //   leds[numero_led] = CRGB::Black;
-        // }
-      } else {
-        //9 leds
-        //leds[numero_led] = CRGB::Red;
-        switch (flip_light) {
-          case 1:
-            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
-            break;
-          case 2:
-            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
-            break;
-          case 3:
-            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
-            break;
-          case 4:
-            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
-            break;
-          case 5:
-            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
-            break;
-          case 6:
-            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
-            break;
-          case 7:
-            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
-            break;
-          case 8:
-            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
-            break;
-          case 9:
-            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
-            break;
-          case 10:
-            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
-            break;
-          case 11:
-            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
-            break;
-          case 12:
-            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
-            break;
-          case 13:
-            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
-            break;
-          case 14:
-            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
-            break;
-          case 15:
-            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
-            break;
-          case 16:
-            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
-            break;
-          case 17:
-            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
-            break;
-          case 18:
-            //not present V2.0  leds[numero_led] = CRGB(0, 255, 0);  //vert
-            break;
-          case 19:
-            //not present V2.0  leds[numero_led] = CRGB(0, 0, 255);  //bleu
-            break;
-          case 20:
-            //not present V2.0  leds[numero_led] = CRGB(255, 255, 255);  //blanc
-            break;
-          default:
-            //not present V2.0  leds[numero_led] = CRGB(255, 0, 0);  //rouge
-            break;
-        }
-      }
-
-      FastLED.show();
+      //no update volume
     }
   }
 
   if (AUDIO_ACTIVE == 1) {
     audio.loop();
   }
-}
+}  //loop
 
 
 //allow liste automatique quand fin de musique
@@ -1613,4 +1394,276 @@ void readBatLevel(void) {
 
   //analogBatVoltage = analogBatVoltage * 100 / 695;  //ratio Vout/Vin=0.6
   analogBatVoltage = (sumBatVoltage >> 4) * 100 / 695;  //ratio Vout/Vin=0.6
+}
+
+
+
+void fadeInLed(void) {
+  powerOnLed();
+  for (int ii = 50; ii < 150; ii = ii + 50) {
+    for (i = 0; i < NUM_LEDS2; i++) {
+      leds2[i] = CRGB(0, 0, ii);
+    }
+    FastLED.show();
+    delay(200);
+  }
+  delay(1000);
+  for (i = 0; i < NUM_LEDS2; i++) {
+    leds2[i] = CRGB(0, 0, 0);
+  }
+  FastLED.show();
+  delay(10);
+  powerOffLed();
+}
+
+
+
+void fadeOutLed(void) {
+  powerOnLed();
+  for (i = 0; i < NUM_LEDS2; i++) {
+    leds2[i] = CRGB(0, 0, 150);
+  }
+  FastLED.show();
+  delay(1000);
+  for (int ii = 100; ii >= 0; ii = ii - 50) {
+
+    for (i = 0; i < NUM_LEDS2; i++) {
+      leds2[i] = CRGB(0, 0, ii);
+    }
+    FastLED.show();
+    delay(200);
+  }
+  powerOffLed();
+}
+
+
+void activeLed(int red, int green, int blue, int active) {
+  for (i = 0; i < NUM_LEDS2; i++) {
+    if (active == 1) {
+      powerOnLed();
+      leds2[i] = CRGB(red, green, blue);
+    } else {
+      powerOffLed();
+    }
+  }
+  delay(10);
+  FastLED.show();
+}
+
+
+void powerOnLed(void) {
+  //power supply led neopixel
+  pinMode(PIN_ENABLE_NEOPIXEL, OUTPUT);
+  digitalWrite(PIN_ENABLE_NEOPIXEL, LOW);  //HIGH:led off LOW:led on
+  delay(2);
+}
+
+
+void powerOffLed(void) {
+  //power supply led neopixel
+  pinMode(PIN_ENABLE_NEOPIXEL, OUTPUT);
+  digitalWrite(PIN_ENABLE_NEOPIXEL, HIGH);  //HIGH:led off LOW:led on
+}
+
+
+// INT0 interrupt callback; update tick_tock flag
+void set_tick_tock(void) {
+  tick_tock = 1;
+}
+
+
+
+int readLightButton(void) {
+  static int firstPress = 1;
+  int lightLevel = 0;
+  //activate detection button
+  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
+  lightLevel = digitalRead(PIN_POWER_BOARD_SWITCH_LIGHT);
+
+  //allow power
+  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+  digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
+
+  if (lightLevel == 0) {
+    //button realize
+    firstPress = 1;
+    return 0;
+  } else {
+    //button press
+    if (firstPress == 1) {
+      firstPress = 0;
+      timeoutPressButtonLight = millis() + LONG_PRESS;
+    }
+
+    if (millis() > timeoutPressButtonLight) { return 2; }
+
+    return 1;
+  }
+}
+
+
+
+int readSwitchEmo(int bypassInt) {
+  byte error;
+  byte inputPort0 = 0;
+  byte inputPort1 = 0;
+  int highByte = 0;
+  int lowByte = 0;
+  int value = 0;
+  unsigned long timeoutI2c = 0;
+  int sw9 = 0;
+  int selection_emo = 0;
+
+  //detect if interrupt active
+  if (bypassInt == 1) {
+
+    if (intDetectExpIoSw9 == 1) {
+      intDetectExpIoSw9 = 0;
+      delay(2);
+      attachInterrupt(digitalPinToInterrupt(PIN_INT_SW9), intExpIoSw9, FALLING);
+    }
+
+    Serial.print("int SW9:");
+    Serial.println(intCmptRotSw9);
+
+    // Commencer la communication avec l'esclave à l'adresse 0x74
+    Wire.beginTransmission(PI4IOE5V9539_ADDR);
+    // Sélectionner le registre 0x00
+    Wire.write(0x00);
+    // Terminer la transmission
+    Wire.endTransmission();
+
+    // Demander 2 octets de données à l'esclave
+    Wire.requestFrom(PI4IOE5V9539_ADDR, 2);
+
+    // Attendre que les données soient disponibles
+    //0.5ms lecture pot 9 pos
+    timeoutI2c = millis() + TIMEOUT_I2C_READ;
+    while (Wire.available() < 2) {
+      if (millis() > timeoutI2c) {
+        break;  //non bloquant
+      }
+    }
+
+    // Lire les octets et les combiner pour former une valeur de 16 bits
+    highByte = Wire.read();
+    lowByte = Wire.read();
+    value = (highByte << 8) | lowByte;
+
+    selection_emo = 0;
+    for (sw9 = 0; sw9 < 10; sw9++) {
+      if (value == intMatSelect[sw9]) {
+        selection_emo = sw9;
+        break;
+      }
+    }
+
+    if (selection_emo == 0)
+      selection_emo = intNumeroDossier;
+
+    // Afficher la valeur lue
+    Serial.print("Selection : ");
+    Serial.println(selection_emo);
+    return selection_emo;
+
+
+  } else {
+    //read if int occur
+    if (intDetectExpIoSw9 == 1) {
+      intDetectExpIoSw9 = 0;
+      delay(2);
+      attachInterrupt(digitalPinToInterrupt(PIN_INT_SW9), intExpIoSw9, FALLING);
+
+      Serial.print("int SW9:");
+      Serial.println(intCmptRotSw9);
+
+      // Commencer la communication avec l'esclave à l'adresse 0x74
+      Wire.beginTransmission(PI4IOE5V9539_ADDR);
+      // Sélectionner le registre 0x00
+      Wire.write(0x00);
+      // Terminer la transmission
+      Wire.endTransmission();
+
+      // Demander 2 octets de données à l'esclave
+      Wire.requestFrom(PI4IOE5V9539_ADDR, 2);
+
+      // Attendre que les données soient disponibles
+      //0.5ms lecture pot 9 pos
+      timeoutI2c = millis() + TIMEOUT_I2C_READ;
+      while (Wire.available() < 2) {
+        if (millis() > timeoutI2c) {
+          break;  //non bloquant
+        }
+      }
+
+      // Lire les octets et les combiner pour former une valeur de 16 bits
+      highByte = Wire.read();
+      lowByte = Wire.read();
+      value = (highByte << 8) | lowByte;
+
+      selection_emo = 0;
+      for (sw9 = 0; sw9 < 10; sw9++) {
+        if (value == intMatSelect[sw9]) {
+          selection_emo = sw9;
+          break;
+        }
+      }
+
+      if (selection_emo == 0)
+        selection_emo = intNumeroDossier;
+
+      // Afficher la valeur lue
+      Serial.print("Selection : ");
+      Serial.println(selection_emo);
+
+      return selection_emo;
+    }
+    return intNumeroDossier;
+  }
+}
+
+
+void changeDirEmotion(int intDirEmotion) {
+  Serial.print("Dossier EMOTION:");
+  Serial.println(intDirEmotion);
+
+  sprintf(name_directory, "/%02d", intDirEmotion);
+  intNbAudioFileInDir = 0;
+  //listDir(SD, "/05", 1);
+  listDir(SD, name_directory, 1);
+
+  nextSong = 0;
+
+  switch (intDirEmotion) {
+    case 1:
+      audio.connecttoSD("/01/000.mp3");
+      break;
+    case 2:
+      audio.connecttoSD("/02/000.mp3");
+      break;
+    case 3:
+      audio.connecttoSD("/03/000.mp3");
+      break;
+    case 4:
+      audio.connecttoSD("/04/000.mp3");
+      break;
+    case 5:
+      audio.connecttoSD("/05/000.mp3");
+      break;
+    case 6:
+      audio.connecttoSD("/06/000.mp3");
+      break;
+    case 7:
+      audio.connecttoSD("/07/000.mp3");
+      break;
+    case 8:
+      audio.connecttoSD("/08/000.mp3");
+      break;
+    case 9:
+      audio.connecttoSD("/09/000.mp3");
+      break;
+    default:
+      audio.connecttoSD("/09/000.mp3");
+      break;
+  }
 }
