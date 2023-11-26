@@ -188,16 +188,16 @@ unsigned long timeoutPressButtonLight = 0;
 unsigned long lastDebounceTimePlay = 0;  // the last time the output pin was toggled
 unsigned long lastDebounceTimeNext = 0;  // the last time the output pin was toggled
 unsigned long debounceDelay = 50;        // the debounce time; increase if the output flickers
-unsigned long longPressButton = 1500;  // long time pressure button
+unsigned long longPressButton = 1500;    // long time pressure button
 
 //button play/pause next
 int readButPlay = 0;
 int readButNext = 0;
-int buttonStatePlay;                     // the current reading from the input pin
-int buttonStateNext;                     // the current reading from the input pin
-int buttonStateLongPress;                // the current reading from the input pin
-int lastButtonPlay = HIGH;               // the previous reading from the input pin
-int lastButtonNext = HIGH;               // the previous reading from the input pin
+int buttonStatePlay;        // the current reading from the input pin
+int buttonStateNext;        // the current reading from the input pin
+int buttonStateLongPress;   // the current reading from the input pin
+int lastButtonPlay = HIGH;  // the previous reading from the input pin
+int lastButtonNext = HIGH;  // the previous reading from the input pin
 
 int nextSong = 0;
 
@@ -376,13 +376,9 @@ void setup() {
     }
   }
 
-
-
   //INIT batterie read voltage pin
   pinMode(PIN_BAT_MEAS_EN, OUTPUT);
   digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
-
-
 
   //sd card
   if (AUDIO_ACTIVE == 1) {
@@ -728,6 +724,10 @@ void loop() {
 
     if (oldButtonlightLevel == 2) {
       //power off
+      //mandalou off audio
+      //audio.connecttoSD("/ADVERT/0004.mp3");  //bug audio with delay bloc
+
+      //led off
       fadeOutLed();
 
       Serial.println("POWER OFF");
