@@ -14,25 +14,16 @@
   io37 : WS_DAC (I2S audio)
 */
 
-//#if ARDUINO_USB_MODE
-//#warning This sketch should be used when USB is in OTG mode
-//void setup(){}
-//void loop(){}
-//#else
-//#include "USB.h"
-//#include "FirmwareMSC.h"
-//
-//#if !ARDUINO_USB_MSC_ON_BOOT
-//FirmwareMSC MSC_Update;
-//#endif
-//#if ARDUINO_USB_CDC_ON_BOOT
-//#define HWSerial Serial0
-//#define USBSerial Serial
-//#else
-//#define HWSerial Serial
-//USBCDC USBSerial;
-//#endif
-
+/*
+.___ _______  _________ .____     ____ ___________  ___________
+|   |\      \ \_   ___ \|    |   |    |   \______ \ \_   _____/
+|   |/   |   \/    \  \/|    |   |    |   /|    |  \ |    __)_ 
+|   /    |    \     \___|    |___|    |  / |    `   \|        \
+|___\____|__  /\______  /_______ \______/ /_______  /_______  /
+            \/        \/        \/                \/        \/ 
+//INCLUDE
+--------------------------------------------------------------------------------------------
+*/
 #include <Arduino.h>
 #include <WiFi.h>
 #include <Audio.h>
@@ -42,10 +33,21 @@
 #include "SPIFFS.h"
 #include "SPI.h"
 #include "time.h"
-
 #include "RTClib.h"
 #include <Wire.h>
 
+
+
+/*
+________  ______________________.___ _______  ___________
+\______ \ \_   _____/\_   _____/|   |\      \ \_   _____/
+ |    |  \ |    __)_  |    __)  |   |/   |   \ |    __)_ 
+ |    `   \|        \ |     \   |   /    |    \|        \
+/_______  /_______  / \___  /   |___\____|__  /_______  /
+        \/        \/      \/                \/        \/ 
+//DEFINE
+--------------------------------------------------------------------------------------------
+*/
 // PINOUT SD CARD
 #define SD_CS 10
 #define SPI_MOSI 11
@@ -77,6 +79,9 @@
 //timeout read I2C
 #define TIMEOUT_I2C_READ 500  //500ms
 
+//button power and light
+#define PIN_POWER_BOARD_SWITCH_LIGHT 7
+
 //TIME long press button light
 #define LONG_PRESS 4000  //4 secondes
 
@@ -85,12 +90,11 @@
 #define PIN_RESET_SW9 3         //RESET: LOW  ACTIVE DEVICE:HIGH
 #define PI4IOE5V9539_ADDR 0x74  //0x74 0xE8  // Adresse I2C du PI4IOE5V9539
 #define PIN_POWER_SW9 40
-#define PIN_POWER_BOARD_SWITCH_LIGHT 7
 
 //neopixel
 #define PIN_ENABLE_NEOPIXEL 41  //40:dev board  41:protov1 not exit on dev board only protov1
 
-//ADC boutton switch rotatif
+//boutton switch rotatif (ADC measure)
 #define PIN_SWITCH_THEME 2
 #define PIN_SWITCH_USER 1
 
@@ -115,22 +119,13 @@ Audio audio;
 //PERIOD DEFINE
 #define PERIOD_LOG_UART 1000  //ms updateTimeGain
 
-//PARAMETERS
-//--------------------------------------------------------------------------------------------
-//WIFI
-String ssid = "*****************";
-String password = "**********************";
-
-#define WIFI_ACTIVE 0       //default 1  update RTC on NTP server
-#define TEST_GAIN_VOLUME 0  //default 0
-#define TEST_LED 0          //default 0  1:test led
-#define LAMPE_NB_COLOR 1    //default 1  20:mix cobinaison couleur  top/bottom
-#define AUDIO_ACTIVE 1      //default 1 (0:PSRAM access)
-#define RTC_ACTIVE 0        //default 1
-#define DEBUG_UART 1        //default 0
-
-int int_test_volume = 0;
-int int_test_led = 50;
+//LED NEOPIXEL
+#define NUM_LEDS 9
+#define NUM_LEDS2 4  ////1: dev board 4:protov1
+#define BRIGHTNESS 200
+#define DATA_PIN 21
+#define DATA_PIN2 21
+#define CLOCK_PIN 13  //not use
 
 
 
@@ -144,13 +139,44 @@ __________                                     __
 //PARAMETERS
 --------------------------------------------------------------------------------------------
 */
+//WIFI
+String ssid = "*****************";
+String password = "**********************";
 
+#define WIFI_ACTIVE 0       //default 1  update RTC on NTP server
+#define TEST_GAIN_VOLUME 0  //default 0
+#define TEST_LED 0          //default 0  1:test led
+#define LAMPE_NB_COLOR 1    //default 1  20:mix cobinaison couleur  top/bottom
+#define AUDIO_ACTIVE 1      //default 1 (0:PSRAM access)
+#define RTC_ACTIVE 0        //default 1
+#define DEBUG_UART 1        //default 0
+
+
+/*
+____   _________ __________.___   _____ __________.____     ___________ _________
+\   \ /   /  _  \\______   \   | /  _  \\______   \    |    \_   _____//   _____/
+ \   Y   /  /_\  \|       _/   |/  /_\  \|    |  _/    |     |    __)_ \_____  \ 
+  \     /    |    \    |   \   /    |    \    |   \    |___  |        \/        \
+   \___/\____|__  /____|_  /___\____|__  /______  /_______ \/_______  /_______  /
+                \/       \/            \/       \/        \/        \/        \/ 
+//VARIABLES
+--------------------------------------------------------------------------------------------
+*/
+
+//test variables
+int int_test_volume = 0;
+int int_test_led = 50;
+int i = 0;  //for loop
+
+//audio variables
 long int valVolume = 0;
 long int valVolumeold = 0;
 int updatevolume = 0;
 int jackInserted = 0;              //status jack audio
 volatile int jackInsertedCnt = 0;  //counter jack status
+int changeGain = 0;
 
+//time variables
 unsigned long nowTimeMillis = 0;
 unsigned long updateTimeVolume = 0;
 unsigned long updateTimeGain = 0;
@@ -159,11 +185,12 @@ unsigned long updateAdcRead = 0;
 unsigned long updateLogUart = 0;
 unsigned long CheckTimeJackInserted = 0;
 unsigned long timeoutPressButtonLight = 0;
+unsigned long lastDebounceTimePlay = 0;  // the last time the output pin was toggled
+unsigned long lastDebounceTimeNext = 0;  // the last time the output pin was toggled
+unsigned long debounceDelay = 50;        // the debounce time; increase if the output flickers
+unsigned long longPressButton = 1500;  // long time pressure button
 
-int i = 0;  //for
-
-int changeGain = 0;
-
+//button play/pause next
 int readButPlay = 0;
 int readButNext = 0;
 int buttonStatePlay;                     // the current reading from the input pin
@@ -171,11 +198,6 @@ int buttonStateNext;                     // the current reading from the input p
 int buttonStateLongPress;                // the current reading from the input pin
 int lastButtonPlay = HIGH;               // the previous reading from the input pin
 int lastButtonNext = HIGH;               // the previous reading from the input pin
-unsigned long lastDebounceTimePlay = 0;  // the last time the output pin was toggled
-unsigned long lastDebounceTimeNext = 0;  // the last time the output pin was toggled
-unsigned long debounceDelay = 50;        // the debounce time; increase if the output flickers
-
-unsigned long longPressButton = 1500;  // long time pressure button
 
 int nextSong = 0;
 
@@ -202,20 +224,8 @@ int indiceBatVoltage = 0;
 //battery
 int chargeStatus = 0;
 
-//fastled
-#define NUM_LEDS 9
-#define BRIGHTNESS 200
-#define DATA_PIN 21
-#define DATA_PIN2 21
-#define CLOCK_PIN 13  //not use
-
-//fastled pot
-#define NUM_LEDS2 4  ////1: dev board 4:protov1
-
-// Define the array of leds
-//CRGB leds[NUM_LEDS];  //not presnet board 2.0
+// Led neopixel
 CRGB leds2[NUM_LEDS2];
-
 CRGB couleur = CRGB(0, 0, 0);
 
 int numero_led = 0;
@@ -274,413 +284,20 @@ void activeLed(int red, int green, int blue, int active);
 int readLightButton(void);
 int readSwitchEmo(int bypassInt);
 void changeDirEmotion(int intDirEmotion);
+void changeGainJack(void);
 
+void initSDCard();
+void listDir(fs::FS &fs, const char *dirname, uint8_t levels);
+void createDir(fs::FS &fs, const char *path);
+void removeDir(fs::FS &fs, const char *path);
+void readFile(fs::FS &fs, const char *path);
+void writeFile(fs::FS &fs, const char *path, const char *message);
+void appendFile(fs::FS &fs, const char *path, const char *message);
+void renameFile(fs::FS &fs, const char *path1, const char *path2);
+void deleteFile(fs::FS &fs, const char *path);
+void testFileIO(fs::FS &fs, const char *path);
 
-
-
-/*
-void rotary_onButtonClick() {
-  static unsigned long lastTimePressed = 0;
-  //ignore multiple press in that time milliseconds
-  if (millis() - lastTimePressed < 500) {
-    return;
-  }
-  lastTimePressed = millis();
-  Serial.print("button pressed ");
-  Serial.print(millis());
-  Serial.println(" milliseconds after restart");
-
-  flip_light++;
-  if (flip_light > LAMPE_NB_COLOR) flip_light = 0;
-
-  ulong_time_picture = millis() + TIME_PICTURE_END;
-}
-
-
-
-void rotary_loop() {
-  //dont print anything unless value changed
-  if (rotaryEncoder.encoderChanged()) {
-    //Serial.print("Value: ");
-    numero_led = rotaryEncoder.readEncoder();
-    intNumeroDossier = (numero_led % intNombreDossier) + 1;
-
-    Serial.print("Dossier THEME:");
-    Serial.println(intNumeroDossier);
-
-    Serial.print("Led : ");
-    Serial.println(numero_led);
-
-    sprintf(name_directory, "/%02d", intNumeroDossier);
-    intNbAudioFileInDir = 0;
-    //listDir(SD, "/05", 1);
-    listDir(SD, name_directory, 1);
-
-    nextSong = 0;
-
-    switch (intNumeroDossier) {
-      case 1:
-        audio.connecttoSD("/01/000.mp3");
-        break;
-      case 2:
-        audio.connecttoSD("/02/000.mp3");
-        break;
-      case 3:
-        audio.connecttoSD("/03/000.mp3");
-        break;
-      case 4:
-        audio.connecttoSD("/04/000.mp3");
-        break;
-      case 5:
-        audio.connecttoSD("/05/000.mp3");
-        break;
-      case 6:
-        audio.connecttoSD("/06/000.mp3");
-        break;
-      case 7:
-        audio.connecttoSD("/07/000.mp3");
-        break;
-      case 8:
-        audio.connecttoSD("/08/000.mp3");
-        break;
-      case 9:
-        audio.connecttoSD("/09/000.mp3");
-        break;
-      default:
-        audio.connecttoSD("/09/000.mp3");
-        break;
-    }
-
-    ulong_time_picture = millis() + TIME_PICTURE_END;
-  }
-  if (rotaryEncoder.isEncoderButtonClicked()) {
-    rotary_onButtonClick();
-  }
-}
-
-
-
-void IRAM_ATTR readEncoderISR() {
-  rotaryEncoder.readEncoder_ISR();
-}
-
-*/
-
-
-void initSDCard() {
-  if (!SD.begin()) {
-    Serial.println("Card Mount Failed");
-    return;
-  }
-  uint8_t cardType = SD.cardType();
-
-  if (cardType == CARD_NONE) {
-    Serial.println("No SD card attached");
-    return;
-  }
-
-  Serial.print("SD Card Type: ");
-  if (cardType == CARD_MMC) {
-    Serial.println("MMC");
-  } else if (cardType == CARD_SD) {
-    Serial.println("SDSC");
-  } else if (cardType == CARD_SDHC) {
-    Serial.println("SDHC");
-  } else {
-    Serial.println("UNKNOWN");
-  }
-  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-  Serial.printf("SD Card Size: %lluMB\n", cardSize);
-}
-
-
-
-void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
-  Serial.printf("Listing directory: %s\n", dirname);
-
-  File root = fs.open(dirname);
-  if (!root) {
-    Serial.println("Failed to open directory");
-    return;
-  }
-  if (!root.isDirectory()) {
-    Serial.println("Not a directory");
-    return;
-  }
-
-  File file = root.openNextFile();
-  while (file) {
-    if (file.isDirectory()) {
-      intNbAudioFileInDir = 0;
-      //Serial.print("  DIR : ");
-      //Serial.println(file.name());
-      if (levels) {
-        char addslash[100];
-        strcpy(addslash, "/");
-        strcat(addslash, file.name());
-        //Serial.println(addslash);
-        listDir(fs, addslash, levels - 1);
-        //listDir(fs,file.name(), levels - 1);
-      }
-    } else {
-
-      intNbAudioFileInDir++;
-      char addfullpath[100];
-      Serial.print("  FILE: ");
-      strcpy(addfullpath, dirname);
-      strcat(addfullpath, "/");
-      strcat(addfullpath, file.name());
-      //Serial.print(file.name());
-      Serial.print(addfullpath);
-      Serial.print("  SIZE: ");
-      Serial.println(file.size());
-    }
-    file = root.openNextFile();
-  }
-
-  Serial.print("File number:");
-  Serial.println(intNbAudioFileInDir);
-}
-
-void createDir(fs::FS &fs, const char *path) {
-  Serial.printf("Creating Dir: %s\n", path);
-  if (fs.mkdir(path)) {
-    Serial.println("Dir created");
-  } else {
-    Serial.println("mkdir failed");
-  }
-}
-
-void removeDir(fs::FS &fs, const char *path) {
-  Serial.printf("Removing Dir: %s\n", path);
-  if (fs.rmdir(path)) {
-    Serial.println("Dir removed");
-  } else {
-    Serial.println("rmdir failed");
-  }
-}
-
-void readFile(fs::FS &fs, const char *path) {
-  Serial.printf("Reading file: %s\n", path);
-
-  File file = fs.open(path);
-  if (!file) {
-    Serial.println("Failed to open file for reading");
-    return;
-  }
-
-  Serial.print("Read from file: ");
-  while (file.available()) {
-    Serial.write(file.read());
-  }
-  file.close();
-}
-
-void writeFile(fs::FS &fs, const char *path, const char *message) {
-  Serial.printf("Writing file: %s\n", path);
-
-  File file = fs.open(path, FILE_WRITE);
-  if (!file) {
-    Serial.println("Failed to open file for writing");
-    return;
-  }
-  if (file.print(message)) {
-    Serial.println("File written");
-  } else {
-    Serial.println("Write failed");
-  }
-  file.close();
-}
-
-void appendFile(fs::FS &fs, const char *path, const char *message) {
-  Serial.printf("Appending to file: %s\n", path);
-
-  File file = fs.open(path, FILE_APPEND);
-  if (!file) {
-    Serial.println("Failed to open file for appending");
-    return;
-  }
-  if (file.print(message)) {
-    Serial.println("Message appended");
-  } else {
-    Serial.println("Append failed");
-  }
-  file.close();
-}
-
-void renameFile(fs::FS &fs, const char *path1, const char *path2) {
-  Serial.printf("Renaming file %s to %s\n", path1, path2);
-  if (fs.rename(path1, path2)) {
-    Serial.println("File renamed");
-  } else {
-    Serial.println("Rename failed");
-  }
-}
-
-void deleteFile(fs::FS &fs, const char *path) {
-  Serial.printf("Deleting file: %s\n", path);
-  if (fs.remove(path)) {
-    Serial.println("File deleted");
-  } else {
-    Serial.println("Delete failed");
-  }
-}
-
-void testFileIO(fs::FS &fs, const char *path) {
-  File file = fs.open(path);
-  static uint8_t buf[512];
-  size_t len = 0;
-  uint32_t start = millis();
-  uint32_t end = start;
-  if (file) {
-    len = file.size();
-    size_t flen = len;
-    start = millis();
-    while (len) {
-      size_t toRead = len;
-      if (toRead > 512) {
-        toRead = 512;
-      }
-      file.read(buf, toRead);
-      len -= toRead;
-    }
-    end = millis() - start;
-    Serial.printf("%u bytes read for %u ms\n", flen, end);
-    file.close();
-  } else {
-    Serial.println("Failed to open file for reading");
-  }
-
-
-  file = fs.open(path, FILE_WRITE);
-  if (!file) {
-    Serial.println("Failed to open file for writing");
-    return;
-  }
-
-  size_t i;
-  start = millis();
-  for (i = 0; i < 2048; i++) {
-    file.write(buf, 512);
-  }
-  end = millis() - start;
-  Serial.printf("%u bytes written for %u ms\n", 2048 * 512, end);
-  file.close();
-}
-
-
-
-void printLocalTime() {
-
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("Failed to obtain time");
-    return;
-  }
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-
-  // Serial.print("Wait time ms:");
-  // updateTimeHorloge = timeinfo.tm_sec;
-  // Serial.print(updateTimeHorloge);
-  // Serial.print(" -- ");
-  updateTimeHorloge = millis() + (60 - timeinfo.tm_sec) * 1000;
-
-  // Serial.println(updateTimeHorloge);
-
-  // Serial.print("Day of week: ");
-  // Serial.println(&timeinfo, "%A");
-  // Serial.print("Month: ");
-  // Serial.println(&timeinfo, "%B");
-  // Serial.print("Day of Month: ");
-  // Serial.println(&timeinfo, "%d");
-  // Serial.print("Year: ");
-  // Serial.println(&timeinfo, "%Y");
-  // Serial.print("Hour: ");
-  // Serial.println(&timeinfo, "%H");
-  // Serial.print("Hour (12 hour format): ");
-  // Serial.println(&timeinfo, "%I");
-  // Serial.print("Minute: ");
-  // Serial.println(&timeinfo, "%M");
-  // Serial.print("Second: ");
-  // Serial.println(&timeinfo, "%S");
-
-  // Serial.println("Time variables");
-  // char timeHour[3];
-  // strftime(timeHour, 3, "%H", &timeinfo);
-  // Serial.println(timeHour);
-  // char timeWeekDay[10];
-  // strftime(timeWeekDay, 10, "%A", &timeinfo);
-  // Serial.println(timeWeekDay);
-  // Serial.println();
-
-
-  //RTC PCF8563
-  if (RTC_ACTIVE == 1) {
-    now = rtc.now();
-  }
-
-  Serial.print(now.year(), DEC);
-  Serial.print('/');
-  Serial.print(now.month(), DEC);
-  Serial.print('/');
-  Serial.print(now.day(), DEC);
-  Serial.print(" (");
-  Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
-  Serial.print(") ");
-  Serial.print(now.hour(), DEC);
-  Serial.print(':');
-  Serial.print(now.minute(), DEC);
-  Serial.print(':');
-  Serial.print(now.second(), DEC);
-  Serial.println();
-}
-
-
-//
-//static void usbEventCallback(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-//  if (event_base == ARDUINO_USB_EVENTS) {
-//    arduino_usb_event_data_t *data = (arduino_usb_event_data_t *)event_data;
-//    switch (event_id) {
-//      case ARDUINO_USB_STARTED_EVENT:
-//        HWSerial.println("USB PLUGGED");
-//        break;
-//      case ARDUINO_USB_STOPPED_EVENT:
-//        HWSerial.println("USB UNPLUGGED");
-//        break;
-//      case ARDUINO_USB_SUSPEND_EVENT:
-//        HWSerial.printf("USB SUSPENDED: remote_wakeup_en: %u\n", data->suspend.remote_wakeup_en);
-//        break;
-//      case ARDUINO_USB_RESUME_EVENT:
-//        HWSerial.println("USB RESUMED");
-//        break;
-//
-//      default:
-//        break;
-//    }
-//  } else if (event_base == ARDUINO_FIRMWARE_MSC_EVENTS) {
-//    arduino_firmware_msc_event_data_t *data = (arduino_firmware_msc_event_data_t *)event_data;
-//    switch (event_id) {
-//      case ARDUINO_FIRMWARE_MSC_START_EVENT:
-//        HWSerial.println("MSC Update Start");
-//        break;
-//      case ARDUINO_FIRMWARE_MSC_WRITE_EVENT:
-//        //HWSerial.printf("MSC Update Write %u bytes at offset %u\n", data->write.size, data->write.offset);
-//        HWSerial.print(".");
-//        break;
-//      case ARDUINO_FIRMWARE_MSC_END_EVENT:
-//        HWSerial.printf("\nMSC Update End: %u bytes\n", data->end.size);
-//        break;
-//      case ARDUINO_FIRMWARE_MSC_ERROR_EVENT:
-//        HWSerial.printf("MSC Update ERROR! Progress: %u bytes\n", data->error.size);
-//        break;
-//      case ARDUINO_FIRMWARE_MSC_POWER_EVENT:
-//        HWSerial.printf("MSC Update Power: power: %u, start: %u, eject: %u", data->power.power_condition, data->power.start, data->power.load_eject);
-//        break;
-//
-//      default:
-//        break;
-//    }
-//  }
-//}
+void printLocalTime();
 
 
 
@@ -701,8 +318,18 @@ void intExpIoSw9() {
 }
 
 
-void setup() {
 
+/*
+  ___________________________________ _____________ 
+ /   _____/\_   _____/\__    ___/    |   \______   \
+ \_____  \  |    __)_   |    |  |    |   /|     ___/
+ /        \ |        \  |    |  |    |  / |    |    
+/_______  //_______  /  |____|  |______/  |____|    
+        \/         \/                               
+//setup init
+--------------------------------------------------------------------------------------------
+*/
+void setup() {
   //auto maintain power of the board when start
   //DO activate when R22 100K remove
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
@@ -1017,22 +644,22 @@ void setup() {
 
 
 
+/*
+.____    ________   ________ __________ 
+|    |   \_____  \  \_____  \\______   \
+|    |    /   |   \  /   |   \|     ___/
+|    |___/    |    \/    |    \    |    
+|_______ \_______  /\_______  /____|    
+        \/       \/         \/          
+//main loop
+--------------------------------------------------------------------------------------------
+*/
 void loop() {
   nowTimeMillis = millis();
   ulong_time_now = millis();
 
   //change gain depending jack inserted
-  // if (jackInserted == 1) {
-  //   //3dB casque
-  //   pinMode(I2S_GAIN, OUTPUT);
-  //   digitalWrite(I2S_GAIN, HIGH);
-  // } else {
-  //   //12db haut parleur
-  //   pinMode(I2S_GAIN, INPUT);
-  //       //3dB casque
-  //   pinMode(I2S_GAIN, OUTPUT);
-  //   digitalWrite(I2S_GAIN, HIGH);
-  // }
+  //changeGainJack();
 
   //check jack status digital pin not analog
   if (millis() > CheckTimeJackInserted) {
@@ -1049,28 +676,13 @@ void loop() {
     analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
     analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
     analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
-    //    Serial.printf("Switch theme = %d\n", analogSwitchTheme);
-    //    analogSwitchTheme = analogReadMilliVolts(PIN_SWITCH_THEME);
-    //Serial.printf("ADC mV theme = %d\n", analogSwitchTheme);
-    //Serial.printf("%d,", analogSwitchTheme);
+    //Serial.printf("Switch theme = %d\n", analogSwitchTheme);
 
     // switch user
     analogSwitchuser = analogRead(PIN_SWITCH_USER);
     analogSwitchuser = analogRead(PIN_SWITCH_USER);
     analogSwitchuser = analogRead(PIN_SWITCH_USER);
-    //    Serial.printf("Switch user = %d\n", analogSwitchuser);
-    //    analogSwitchuser = analogReadMilliVolts(PIN_SWITCH_USER);
-    //Serial.printf("ADC mV user = %d\n", analogSwitchuser);
-    //Serial.printf("%d,", analogSwitchuser);
-
-    //Jack connected
-    //    analogJackInserted = analogRead(PIN_ADC_JACK_DETECT);
-    //    Serial.printf("ADC jack = %d\n", analogJackInserted);
-    //analogJackInserted = analogReadMilliVolts(PIN_ADC_JACK_DETECT);
-    //analogJackInserted = digitalRead(PIN_ADC_JACK_DETECT);
-    //Serial.printf("ADC mV jack = %d\n", analogJackInserted);
-    //Serial.printf("%d\n", analogJackInserted);
-    //Serial.printf("%d,%d\n", jackInsertedCnt, jackInserted);
+    //Serial.printf("Switch user = %d\n", analogSwitchuser);
 
     //Battery voltage adc@3.1V
     readBatLevel();
@@ -1078,7 +690,6 @@ void loop() {
     //Charge status
     chargeStatus = digitalRead(PIN_CHARGE_STATUS);
   }
-
 
   //log data
   logUart();
@@ -1090,17 +701,12 @@ void loop() {
     }
   }
 
-  //in loop call your custom function which will process rotary encoder values
-  //not present on ver 2.0
-  //rotary_loop();
-
   //read switch 9 pos emotion
   intNumeroDossier = readSwitchEmo(0);  //1 direct read  0:wait interrupt for reading
   if (intNumeroDossier != intOldNumeroDossier) {
     intOldNumeroDossier = intNumeroDossier;
     changeDirEmotion(intNumeroDossier);
   }
-
 
   //read button light on pwer ohh if long press
   buttonlightLevel = readLightButton();
@@ -1113,7 +719,7 @@ void loop() {
         activeLed(0, 150, 0, 1);  // red,  green,  blue,  active
       else
         activeLed(0, 0, 0, 0);  // red,  green,  blue,  active
-      Serial.println(buttonlightLevel);
+      Serial.println(flipLight);
     } else {
       Serial.println(buttonlightLevel);
     }
@@ -1131,7 +737,8 @@ void loop() {
       }
       Serial.println("OFF");
       pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
-      digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+      //allow at the end digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+      delay(20);
     }
   }
 
@@ -1269,6 +876,243 @@ void loop() {
 }  //loop
 
 
+
+void initSDCard() {
+  if (!SD.begin()) {
+    Serial.println("Card Mount Failed");
+    return;
+  }
+  uint8_t cardType = SD.cardType();
+
+  if (cardType == CARD_NONE) {
+    Serial.println("No SD card attached");
+    return;
+  }
+
+  Serial.print("SD Card Type: ");
+  if (cardType == CARD_MMC) {
+    Serial.println("MMC");
+  } else if (cardType == CARD_SD) {
+    Serial.println("SDSC");
+  } else if (cardType == CARD_SDHC) {
+    Serial.println("SDHC");
+  } else {
+    Serial.println("UNKNOWN");
+  }
+  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+  Serial.printf("SD Card Size: %lluMB\n", cardSize);
+}
+
+
+
+void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
+  Serial.printf("Listing directory: %s\n", dirname);
+
+  File root = fs.open(dirname);
+  if (!root) {
+    Serial.println("Failed to open directory");
+    return;
+  }
+  if (!root.isDirectory()) {
+    Serial.println("Not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      intNbAudioFileInDir = 0;
+      //Serial.print("  DIR : ");
+      //Serial.println(file.name());
+      if (levels) {
+        char addslash[100];
+        strcpy(addslash, "/");
+        strcat(addslash, file.name());
+        //Serial.println(addslash);
+        listDir(fs, addslash, levels - 1);
+        //listDir(fs,file.name(), levels - 1);
+      }
+    } else {
+
+      intNbAudioFileInDir++;
+      char addfullpath[100];
+      Serial.print("  FILE: ");
+      strcpy(addfullpath, dirname);
+      strcat(addfullpath, "/");
+      strcat(addfullpath, file.name());
+      //Serial.print(file.name());
+      Serial.print(addfullpath);
+      Serial.print("  SIZE: ");
+      Serial.println(file.size());
+    }
+    file = root.openNextFile();
+  }
+
+  Serial.print("File number:");
+  Serial.println(intNbAudioFileInDir);
+}
+
+void createDir(fs::FS &fs, const char *path) {
+  Serial.printf("Creating Dir: %s\n", path);
+  if (fs.mkdir(path)) {
+    Serial.println("Dir created");
+  } else {
+    Serial.println("mkdir failed");
+  }
+}
+
+void removeDir(fs::FS &fs, const char *path) {
+  Serial.printf("Removing Dir: %s\n", path);
+  if (fs.rmdir(path)) {
+    Serial.println("Dir removed");
+  } else {
+    Serial.println("rmdir failed");
+  }
+}
+
+void readFile(fs::FS &fs, const char *path) {
+  Serial.printf("Reading file: %s\n", path);
+
+  File file = fs.open(path);
+  if (!file) {
+    Serial.println("Failed to open file for reading");
+    return;
+  }
+
+  Serial.print("Read from file: ");
+  while (file.available()) {
+    Serial.write(file.read());
+  }
+  file.close();
+}
+
+void writeFile(fs::FS &fs, const char *path, const char *message) {
+  Serial.printf("Writing file: %s\n", path);
+
+  File file = fs.open(path, FILE_WRITE);
+  if (!file) {
+    Serial.println("Failed to open file for writing");
+    return;
+  }
+  if (file.print(message)) {
+    Serial.println("File written");
+  } else {
+    Serial.println("Write failed");
+  }
+  file.close();
+}
+
+void appendFile(fs::FS &fs, const char *path, const char *message) {
+  Serial.printf("Appending to file: %s\n", path);
+
+  File file = fs.open(path, FILE_APPEND);
+  if (!file) {
+    Serial.println("Failed to open file for appending");
+    return;
+  }
+  if (file.print(message)) {
+    Serial.println("Message appended");
+  } else {
+    Serial.println("Append failed");
+  }
+  file.close();
+}
+
+void renameFile(fs::FS &fs, const char *path1, const char *path2) {
+  Serial.printf("Renaming file %s to %s\n", path1, path2);
+  if (fs.rename(path1, path2)) {
+    Serial.println("File renamed");
+  } else {
+    Serial.println("Rename failed");
+  }
+}
+
+void deleteFile(fs::FS &fs, const char *path) {
+  Serial.printf("Deleting file: %s\n", path);
+  if (fs.remove(path)) {
+    Serial.println("File deleted");
+  } else {
+    Serial.println("Delete failed");
+  }
+}
+
+void testFileIO(fs::FS &fs, const char *path) {
+  File file = fs.open(path);
+  static uint8_t buf[512];
+  size_t len = 0;
+  uint32_t start = millis();
+  uint32_t end = start;
+  if (file) {
+    len = file.size();
+    size_t flen = len;
+    start = millis();
+    while (len) {
+      size_t toRead = len;
+      if (toRead > 512) {
+        toRead = 512;
+      }
+      file.read(buf, toRead);
+      len -= toRead;
+    }
+    end = millis() - start;
+    Serial.printf("%u bytes read for %u ms\n", flen, end);
+    file.close();
+  } else {
+    Serial.println("Failed to open file for reading");
+  }
+
+
+  file = fs.open(path, FILE_WRITE);
+  if (!file) {
+    Serial.println("Failed to open file for writing");
+    return;
+  }
+
+  size_t i;
+  start = millis();
+  for (i = 0; i < 2048; i++) {
+    file.write(buf, 512);
+  }
+  end = millis() - start;
+  Serial.printf("%u bytes written for %u ms\n", 2048 * 512, end);
+  file.close();
+}
+
+
+
+void printLocalTime() {
+
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    return;
+  }
+  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+
+  updateTimeHorloge = millis() + (60 - timeinfo.tm_sec) * 1000;
+
+  //RTC PCF8563
+  if (RTC_ACTIVE == 1) {
+    now = rtc.now();
+  }
+
+  Serial.print(now.year(), DEC);
+  Serial.print('/');
+  Serial.print(now.month(), DEC);
+  Serial.print('/');
+  Serial.print(now.day(), DEC);
+  Serial.print(" (");
+  Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
+  Serial.print(") ");
+  Serial.print(now.hour(), DEC);
+  Serial.print(':');
+  Serial.print(now.minute(), DEC);
+  Serial.print(':');
+  Serial.print(now.second(), DEC);
+  Serial.println();
+}
+
+
+
 //allow liste automatique quand fin de musique
 void audio_eof_mp3(const char *info) {  //end of file
   Serial.print("audio_info: ");
@@ -1400,12 +1244,12 @@ void readBatLevel(void) {
 
 void fadeInLed(void) {
   powerOnLed();
-  for (int ii = 50; ii < 150; ii = ii + 50) {
+  for (int ii = 10; ii < 150; ii = ii + 10) {
     for (i = 0; i < NUM_LEDS2; i++) {
       leds2[i] = CRGB(0, 0, ii);
     }
     FastLED.show();
-    delay(200);
+    delay(100);
   }
   delay(1000);
   for (i = 0; i < NUM_LEDS2; i++) {
@@ -1425,13 +1269,13 @@ void fadeOutLed(void) {
   }
   FastLED.show();
   delay(1000);
-  for (int ii = 100; ii >= 0; ii = ii - 50) {
+  for (int ii = 140; ii >= 0; ii = ii - 10) {
 
     for (i = 0; i < NUM_LEDS2; i++) {
       leds2[i] = CRGB(0, 0, ii);
     }
     FastLED.show();
-    delay(200);
+    delay(100);
   }
   powerOffLed();
 }
@@ -1665,5 +1509,21 @@ void changeDirEmotion(int intDirEmotion) {
     default:
       audio.connecttoSD("/09/000.mp3");
       break;
+  }
+}
+
+
+
+void changeGainJack(void) {
+  if (jackInserted == 1) {
+    //3dB casque
+    pinMode(I2S_GAIN, OUTPUT);
+    digitalWrite(I2S_GAIN, HIGH);
+  } else {
+    //12db haut parleur
+    pinMode(I2S_GAIN, INPUT);
+    //3dB casque
+    pinMode(I2S_GAIN, OUTPUT);
+    digitalWrite(I2S_GAIN, HIGH);
   }
 }
