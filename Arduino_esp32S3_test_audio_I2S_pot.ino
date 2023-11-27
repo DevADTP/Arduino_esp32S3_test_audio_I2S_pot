@@ -36,7 +36,8 @@
 #include "RTClib.h"
 #include <Wire.h>
 
-
+// #include "SdFat.h"
+// #include "Adafruit_TinyUSB.h"
 
 /*
 ________  ______________________.___ _______  ___________
@@ -162,6 +163,18 @@ ____   _________ __________.___   _____ __________.____     ___________ ________
 //VARIABLES
 --------------------------------------------------------------------------------------------
 */
+
+// // File system on SD Card
+// SdFat sd;
+
+// SdFile root;
+// SdFile file;
+
+// // USB Mass Storage object
+// Adafruit_USBD_MSC usb_msc;
+
+// // Set to true when PC write to flash
+// bool fs_changed;
 
 //test variables
 int int_test_volume = 0;
@@ -299,6 +312,9 @@ void testFileIO(fs::FS &fs, const char *path);
 
 void printLocalTime();
 
+void msc_flush_cb(void);
+int32_t msc_write_cb(uint32_t lba, uint8_t *buffer, uint32_t bufsize);
+int32_t msc_read_cb(uint32_t lba, void *buffer, uint32_t bufsize);
 
 
 //INTERRUPT jack audio inserted
@@ -636,6 +652,44 @@ void setup() {
 
   //init switch 9 pos emotion
   intNumeroDossier = readSwitchEmo(1);  //1 direct read  0:wait interrupt for reading
+
+//   // Set disk vendor id, product id and revision with string up to 8, 16, 4 characters respectively
+//   usb_msc.setID("Mandalou", "SDCard", "1.0");
+
+
+//   // Set read write callback
+//   usb_msc.setReadWriteCallback(msc_read_cb, msc_write_cb, msc_flush_cb);
+
+//   // Still initialize MSC but tell usb stack that MSC is not ready to read/write
+//   // If we don't initialize, board will be enumerated as CDC only
+//   usb_msc.setUnitReady(false);
+//   usb_msc.begin();
+
+//   if (!sd.begin(SD_CS, SD_SCK_MHZ(50))) {
+//     Serial.println("initialization failed. Things to check:");
+//     Serial.println("* is a card inserted?");
+//     Serial.println("* is your wiring correct?");
+//     Serial.println("* did you change the chipSelect pin to match your shield or module?");
+//     while (1) delay(1);
+//   }
+
+//   // Size in blocks (512 bytes)
+// #if SD_FAT_VERSION >= 20000
+//   uint32_t block_count = sd.card()->sectorCount();
+// #else
+//   uint32_t block_count = sd.card()->cardSize();
+// #endif
+
+//   Serial.print("Volume size (MB):  ");
+//   Serial.println((block_count / 2) / 1024);
+
+//   // Set disk size, SD block size is always 512
+//   usb_msc.setCapacity(block_count, 512);
+
+//   // MSC is ready for read/write
+//   usb_msc.setUnitReady(true);
+
+//   fs_changed = true;  // to print contents initially
 }
 
 
@@ -737,7 +791,7 @@ void loop() {
       }
       Serial.println("OFF");
       pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
-      //allow at the end digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+      digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
       delay(20);
     }
   }
@@ -878,7 +932,7 @@ void loop() {
 
 
 void initSDCard() {
-  if (!SD.begin()) {
+  if (!SD.begin(SD_CS)) {
     Serial.println("Card Mount Failed");
     return;
   }
@@ -1527,3 +1581,54 @@ void changeGainJack(void) {
     digitalWrite(I2S_GAIN, HIGH);
   }
 }
+
+/*
+// Callback invoked when received READ10 command.
+// Copy disk's data to buffer (up to bufsize) and
+// return number of copied bytes (must be multiple of block size)
+int32_t msc_read_cb(uint32_t lba, void *buffer, uint32_t bufsize) {
+  bool rc;
+
+#if SD_FAT_VERSION >= 20000
+  rc = sd.card()->readSectors(lba, (uint8_t *)buffer, bufsize / 512);
+#else
+  rc = sd.card()->readBlocks(lba, (uint8_t *)buffer, bufsize / 512);
+#endif
+
+  return rc ? bufsize : -1;
+}
+
+// Callback invoked when received WRITE10 command.
+// Process data in buffer to disk's storage and
+// return number of written bytes (must be multiple of block size)
+int32_t msc_write_cb(uint32_t lba, uint8_t *buffer, uint32_t bufsize) {
+  bool rc;
+
+  // digitalWrite(LED_BUILTIN, HIGH);
+
+#if SD_FAT_VERSION >= 20000
+  rc = sd.card()->writeSectors(lba, buffer, bufsize / 512);
+#else
+  rc = sd.card()->writeBlocks(lba, buffer, bufsize / 512);
+#endif
+
+  return rc ? bufsize : -1;
+}
+
+// Callback invoked when WRITE10 command is completed (status received and accepted by host).
+// used to flush any pending cache.
+void msc_flush_cb(void) {
+#if SD_FAT_VERSION >= 20000
+  sd.card()->syncDevice();
+#else
+  sd.card()->syncBlocks();
+#endif
+
+  // clear file system's cache to force refresh
+  //sd.cacheClear();
+
+  fs_changed = true;
+
+  // digitalWrite(LED_BUILTIN, LOW);
+}
+*/
