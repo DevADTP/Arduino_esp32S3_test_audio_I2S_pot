@@ -215,10 +215,12 @@ int lastButtonNext = HIGH;  // the previous reading from the input pin
 int nextSong = 0;
 
 //switch emotion 9 postiions
+//switch theme 5 positions
 int intDetectExpIoSw9 = 0;
 int intCmptRotSw9 = 0;
 int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
-
+int intMatTheme[8] = { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 };
+int intVarAdc = 10;
 
 //button light
 int buttonlightLevel = 0;
@@ -249,9 +251,11 @@ unsigned long ulong_time_picture = 0;  //TIME_PICTURE_END
 
 //files
 int intNbAudioFileInDir = 0;
-int intNumeroDossier = 9;
+int intNumeroDossier = 9;  //emotion
+int intthemeChoice = 0;
 int intOldNumeroDossier = 0;
 int intNombreDossier = 9;
+
 
 char name_directory[100] = "/09";
 
@@ -287,6 +291,7 @@ ___________                   __  .__
 */
 void change_song(void);
 void logUart(void);
+int themeSelect(void);
 void readBatLevel(void);
 void set_tick_tock(void);
 void powerOffLed(void);
@@ -653,43 +658,43 @@ void setup() {
   //init switch 9 pos emotion
   intNumeroDossier = readSwitchEmo(1);  //1 direct read  0:wait interrupt for reading
 
-//   // Set disk vendor id, product id and revision with string up to 8, 16, 4 characters respectively
-//   usb_msc.setID("Mandalou", "SDCard", "1.0");
+  //   // Set disk vendor id, product id and revision with string up to 8, 16, 4 characters respectively
+  //   usb_msc.setID("Mandalou", "SDCard", "1.0");
 
 
-//   // Set read write callback
-//   usb_msc.setReadWriteCallback(msc_read_cb, msc_write_cb, msc_flush_cb);
+  //   // Set read write callback
+  //   usb_msc.setReadWriteCallback(msc_read_cb, msc_write_cb, msc_flush_cb);
 
-//   // Still initialize MSC but tell usb stack that MSC is not ready to read/write
-//   // If we don't initialize, board will be enumerated as CDC only
-//   usb_msc.setUnitReady(false);
-//   usb_msc.begin();
+  //   // Still initialize MSC but tell usb stack that MSC is not ready to read/write
+  //   // If we don't initialize, board will be enumerated as CDC only
+  //   usb_msc.setUnitReady(false);
+  //   usb_msc.begin();
 
-//   if (!sd.begin(SD_CS, SD_SCK_MHZ(50))) {
-//     Serial.println("initialization failed. Things to check:");
-//     Serial.println("* is a card inserted?");
-//     Serial.println("* is your wiring correct?");
-//     Serial.println("* did you change the chipSelect pin to match your shield or module?");
-//     while (1) delay(1);
-//   }
+  //   if (!sd.begin(SD_CS, SD_SCK_MHZ(50))) {
+  //     Serial.println("initialization failed. Things to check:");
+  //     Serial.println("* is a card inserted?");
+  //     Serial.println("* is your wiring correct?");
+  //     Serial.println("* did you change the chipSelect pin to match your shield or module?");
+  //     while (1) delay(1);
+  //   }
 
-//   // Size in blocks (512 bytes)
-// #if SD_FAT_VERSION >= 20000
-//   uint32_t block_count = sd.card()->sectorCount();
-// #else
-//   uint32_t block_count = sd.card()->cardSize();
-// #endif
+  //   // Size in blocks (512 bytes)
+  // #if SD_FAT_VERSION >= 20000
+  //   uint32_t block_count = sd.card()->sectorCount();
+  // #else
+  //   uint32_t block_count = sd.card()->cardSize();
+  // #endif
 
-//   Serial.print("Volume size (MB):  ");
-//   Serial.println((block_count / 2) / 1024);
+  //   Serial.print("Volume size (MB):  ");
+  //   Serial.println((block_count / 2) / 1024);
 
-//   // Set disk size, SD block size is always 512
-//   usb_msc.setCapacity(block_count, 512);
+  //   // Set disk size, SD block size is always 512
+  //   usb_msc.setCapacity(block_count, 512);
 
-//   // MSC is ready for read/write
-//   usb_msc.setUnitReady(true);
+  //   // MSC is ready for read/write
+  //   usb_msc.setUnitReady(true);
 
-//   fs_changed = true;  // to print contents initially
+  //   fs_changed = true;  // to print contents initially
 }
 
 
@@ -727,6 +732,7 @@ void loop() {
     analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
     analogSwitchTheme = analogRead(PIN_SWITCH_THEME);
     //Serial.printf("Switch theme = %d\n", analogSwitchTheme);
+    intthemeChoice = themeSelect(analogSwitchTheme);
 
     // switch user
     analogSwitchuser = analogRead(PIN_SWITCH_USER);
@@ -769,9 +775,9 @@ void loop() {
         activeLed(0, 150, 0, 1);  // red,  green,  blue,  active
       else
         activeLed(0, 0, 0, 0);  // red,  green,  blue,  active
-      Serial.println(flipLight);
+      //Serial.println(flipLight);
     } else {
-      Serial.println(buttonlightLevel);
+      //Serial.println(buttonlightLevel);
     }
 
     oldButtonlightLevel = buttonlightLevel;
@@ -791,7 +797,7 @@ void loop() {
       }
       Serial.println("OFF");
       pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
-      digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+      //digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
       delay(20);
     }
   }
@@ -900,7 +906,9 @@ void loop() {
     updateTimeVolume = nowTimeMillis + PERIOD_READ_VOLUME;
 
     valVolume = 4095 - analogRead(PIN_VOLUME);
-    valVolume = (valVolume * 21) / 4095;
+    //valVolume = (valVolume * 21) / 4095;
+
+    valVolume = map(valVolume, 0, 4095, 0, 21);
 
     if (valVolume >= 21) valVolume = 21;
     if (valVolume <= 0) valVolume = 0;
@@ -910,9 +918,9 @@ void loop() {
 
     if (updatevolume == 1) {
 
-      Serial.print(valVolume);
-      Serial.print(",");
-      Serial.println(updatevolume);
+      // Serial.print(valVolume);
+      // Serial.print(",");
+      // Serial.println(updatevolume);
       updatevolume = 0;
       valVolumeold = valVolume;
       if (AUDIO_ACTIVE == 1) {
@@ -1251,16 +1259,42 @@ void change_song(void) {
 }
 
 
+
+int themeSelect(int adcValue) {
+  static int choiceDetect = 0;
+
+  for (int kk = 0; kk < 8; kk++) {
+    if (((intMatTheme[kk] - intVarAdc) < adcValue) && adcValue < (intMatTheme[kk] + intVarAdc)) {
+      choiceDetect = kk;
+      break;
+    }
+  }
+  return choiceDetect;
+}
+
+
+
 void logUart(void) {
-  //adc theme  |  ADC user | jack cnt  | status jack insert | batterie voltage | charge status | PSRAM
+  //adc theme  | theme1-5 |  ADC user | led_status | emotion |volume0-21 | jack cnt  | status jack insert | batterie voltage | charge status | PSRAM
   if (millis() > updateLogUart) {
     updateLogUart = millis() + PERIOD_LOG_UART;
 
     Serial.printf("%d,", analogSwitchTheme);
-    Serial.printf("%d,", analogSwitchuser);
-    Serial.printf("%d,%d,", jackInsertedCnt, jackInserted);
-    Serial.printf("%d,", analogBatVoltage);
+    //Méditation Yoga Musique Histoire Bruit Blanc
+    Serial.printf("%d,", intthemeChoice);
 
+    Serial.printf("%d,", analogSwitchuser);
+
+    Serial.printf("%d,", flipLight);  //led status
+
+    Serial.printf("%d,", intNumeroDossier);  //emotion
+
+
+
+    Serial.printf("%d,", valVolume);
+    Serial.printf("%d,%d,", jackInsertedCnt, jackInserted);
+
+    Serial.printf("%d,", analogBatVoltage);
     Serial.printf("%d,", chargeStatus);
 
     Serial.print(ESP.getFreePsram());
