@@ -1,0 +1,32 @@
+repartiion dossier mp3
+
+01 : music zen
+02 : comptines
+03 : divers
+04 : compte enfants
+05 : piano et musique classique
+06 : non fonctionnel
+07 : non fonctionnel
+08 : non fonctionnel
+09 : non fonctionnel
+10 : non fonctionnel
+11 : non fonctionnel
+12 : non fonctionnel
+13 : non fonctionnel
+14 : non fonctionnel
+15 : non fonctionnel
+16 : non fonctionnel
+17 : non fonctionnel
+
+advertissement : 
+0001 : fonction non dispo
+0002 : batterie bas
+0003 : demmarrage
+0004 : arret
+0005 : lumiere on
+0006 : lumiére off
+0007 : veille
+0008 : USB connecté
+0009 : USB deconnecté
+0010 : USB connecté infos complete
+0011 - 0027 : theme XX non disponible
