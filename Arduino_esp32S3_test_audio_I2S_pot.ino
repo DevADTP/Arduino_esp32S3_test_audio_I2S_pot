@@ -924,7 +924,6 @@ void loop() {
     if ((valVolumeold - valVolume) > 1) updatevolume = 1;
 
     if (updatevolume == 1) {
-
       // Serial.print(valVolume);
       // Serial.print(",");
       // Serial.println(updatevolume);
@@ -1182,7 +1181,7 @@ void printLocalTime() {
 
 
 
-//allow liste automatique quand fin de musique
+//auto loop directory
 void audio_eof_mp3(const char *info) {  //end of file
   Serial.print("audio_info: ");
   Serial.println(info);
@@ -1198,85 +1197,12 @@ void change_song(void) {
   char local_name_directory[100] = "/09";
 
   if (nextSong >= (intNbAudioFileInDir - 1)) nextSong = 0;  //intNbAudioFileInDir
-                                                            // sprintf(local_name_directory, "/%02d/%03d.mp3", intNumeroDossier, (nextSong + 1));
-                                                            // audio.connecttoSD(local_name_directory);
-                                                            // Serial.println(local_name_directory);
 
   //theme test
   sprintf(local_name_directory, "/%02d/%02d/%03d.mp3", intNumeroDossier, intthemeChoice, (nextSong + 1));
   audio.connecttoSD(local_name_directory);
   Serial.println(local_name_directory);
 
-  /*
-  switch (intNumeroDossier) {
-    case 1:
-      if (nextSong > 1) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/01/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/01/003.mp3");
-      break;
-    case 2:
-      if (nextSong > 4) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/02/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/02/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/02/003.mp3");
-      if (nextSong == 3) audio.connecttoSD("/02/004.mp3");
-      if (nextSong == 4) audio.connecttoSD("/02/005.mp3");
-      break;
-    case 3:
-      if (nextSong > 3) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/03/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/03/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/03/003.mp3");
-      if (nextSong == 3) audio.connecttoSD("/03/004.mp3");
-      break;
-    case 4:
-      if (nextSong > 1) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/04/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/04/002.mp3");
-      break;
-    case 5:
-      if (nextSong > 0) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/05/001.mp3");
-      break;
-    case 6:
-      if (nextSong > 2) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/06/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/06/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/06/003.mp3");
-      break;
-    case 7:
-      if (nextSong > 0) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/07/001.mp3");
-      break;
-    case 8:
-      if (nextSong > 1) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/08/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/08/002.mp3");
-      break;
-    case 9:
-      if (nextSong > 7) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/09/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/09/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/09/003.mp3");
-      if (nextSong == 3) audio.connecttoSD("/09/004.mp3");
-      if (nextSong == 4) audio.connecttoSD("/09/005.mp3");
-      if (nextSong == 5) audio.connecttoSD("/09/006.mp3");
-      if (nextSong == 6) audio.connecttoSD("/09/007.mp3");
-      if (nextSong == 7) audio.connecttoSD("/09/008.mp3");
-      break;
-    default:
-      if (nextSong > 7) nextSong = 0;
-      if (nextSong == 0) audio.connecttoSD("/09/001.mp3");
-      if (nextSong == 1) audio.connecttoSD("/09/002.mp3");
-      if (nextSong == 2) audio.connecttoSD("/09/003.mp3");
-      if (nextSong == 3) audio.connecttoSD("/09/004.mp3");
-      if (nextSong == 4) audio.connecttoSD("/09/005.mp3");
-      if (nextSong == 5) audio.connecttoSD("/09/006.mp3");
-      if (nextSong == 6) audio.connecttoSD("/09/007.mp3");
-      if (nextSong == 7) audio.connecttoSD("/09/008.mp3");
-      break;
-  }
-  */
 }
 
 
@@ -1312,12 +1238,8 @@ int themeSelect(int adcValue) {
           // no change
           break;
       }
-      // if (kk == 2 || kk == 1 || kk == 0 || kk == 7 || kk == 6) {
-      //   choiceDetect = kk;
-      //   break;
-      // }
     }
-  }  //for 8 choices
+  }  //for 8 choices (switch theme 8 positions but used only 5 positions 2-1-0-7-6)
   return choiceDetect;
 }
 
@@ -1351,6 +1273,7 @@ void logUart(void) {
     Serial.printf("\n");
   }
 }
+
 
 
 void readBatLevel(void) {
@@ -1419,6 +1342,7 @@ void fadeOutLed(void) {
 }
 
 
+
 void activeLed(int red, int green, int blue, int active) {
   for (i = 0; i < NUM_LEDS2; i++) {
     if (active == 1) {
@@ -1441,11 +1365,13 @@ void powerOnLed(void) {
 }
 
 
+
 void powerOffLed(void) {
   //power supply led neopixel
   pinMode(PIN_ENABLE_NEOPIXEL, OUTPUT);
   digitalWrite(PIN_ENABLE_NEOPIXEL, HIGH);  //HIGH:led off LOW:led on
 }
+
 
 
 // INT0 interrupt callback; update tick_tock flag
@@ -1605,6 +1531,7 @@ int readSwitchEmo(int bypassInt) {
 }
 
 
+
 void changeDirEmotion(int intDirEmotion) {
 
   char local_name_directory[100] = "/09";
@@ -1612,50 +1539,15 @@ void changeDirEmotion(int intDirEmotion) {
   Serial.print("Dossier EMOTION:");
   Serial.println(intDirEmotion);
 
-  //sprintf(name_directory, "/%02d", intDirEmotion);
   sprintf(name_directory, "/%02d/%02d", intDirEmotion, intthemeChoice);
 
   intNbAudioFileInDir = 0;
-  //listDir(SD, "/05", 1);
   listDir(SD, name_directory, 1);
 
   nextSong = 0;
 
   sprintf(local_name_directory, "/%02d/%02d/000.mp3", intNumeroDossier, intthemeChoice);
   audio.connecttoSD(local_name_directory);
-
-  // switch (intDirEmotion) {
-  //   case 1:
-  //     audio.connecttoSD("/01/000.mp3");
-  //     break;
-  //   case 2:
-  //     audio.connecttoSD("/02/000.mp3");
-  //     break;
-  //   case 3:
-  //     audio.connecttoSD("/03/000.mp3");
-  //     break;
-  //   case 4:
-  //     audio.connecttoSD("/04/000.mp3");
-  //     break;
-  //   case 5:
-  //     audio.connecttoSD("/05/000.mp3");
-  //     break;
-  //   case 6:
-  //     audio.connecttoSD("/06/000.mp3");
-  //     break;
-  //   case 7:
-  //     audio.connecttoSD("/07/000.mp3");
-  //     break;
-  //   case 8:
-  //     audio.connecttoSD("/08/000.mp3");
-  //     break;
-  //   case 9:
-  //     audio.connecttoSD("/09/000.mp3");
-  //     break;
-  //   default:
-  //     audio.connecttoSD("/09/000.mp3");
-  //     break;
-  // }
 }
 
 
