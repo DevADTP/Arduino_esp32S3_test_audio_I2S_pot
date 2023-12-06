@@ -36,8 +36,8 @@
 #include "RTClib.h"
 #include <Wire.h>
 
-// #include "SdFat.h"
-// #include "Adafruit_TinyUSB.h"
+#include "SdFat.h"
+#include "Adafruit_TinyUSB.h"
 
 /*
 ________  ______________________.___ _______  ___________
@@ -54,6 +54,12 @@ ________  ______________________.___ _______  ___________
 #define SPI_MOSI 11
 #define SPI_MISO 13
 #define SPI_SCK 12
+
+// PINOUT SD CARD USB stick
+#define SD_CS2 10
+#define SPI_MOSI2 11
+#define SPI_MISO2 13
+#define SPI_SCK2 12
 
 //PINOUT I2S CARD (AUDIO 3W)
 #define I2S_DOUT 45  //35:protoV1  45:protoV2
@@ -164,22 +170,23 @@ ____   _________ __________.___   _____ __________.____     ___________ ________
 --------------------------------------------------------------------------------------------
 */
 
-// // File system on SD Card
-// SdFat sd;
+// File system on SD Card
+SdFat sd;
+SdFile root;
+SdFile file;
+// USB Mass Storage object
+Adafruit_USBD_MSC usb_msc;
+// Set to true when PC write to flash
+bool fs_changed;
 
-// SdFile root;
-// SdFile file;
 
-// // USB Mass Storage object
-// Adafruit_USBD_MSC usb_msc;
-
-// // Set to true when PC write to flash
-// bool fs_changed;
 
 //test variables
 int int_test_volume = 0;
 int int_test_led = 50;
-int i = 0;  //for loop
+int i = 0;   //for loop
+int ii = 0;  //for loop
+int jj = 0;  //for loop
 
 //audio variables
 long int valVolume = 0;
@@ -214,7 +221,7 @@ int lastButtonNext = HIGH;  // the previous reading from the input pin
 
 int nextSong = 0;
 
-//switch emotion 9 postiions
+//switch emotion 9 positions
 //switch theme 5 positions
 int intDetectExpIoSw9 = 0;
 int intCmptRotSw9 = 0;
@@ -225,6 +232,7 @@ int intVarAdc = 10;
 //button light
 int buttonlightLevel = 0;
 int oldButtonlightLevel = 0;
+int lightLevel = 0;
 
 
 //adc
@@ -322,6 +330,12 @@ void msc_flush_cb(void);
 int32_t msc_write_cb(uint32_t lba, uint8_t *buffer, uint32_t bufsize);
 int32_t msc_read_cb(uint32_t lba, void *buffer, uint32_t bufsize);
 
+//setup and loop modes
+void setup_usb();
+void loop_usb();
+void loop_veilleuse();
+void setup_veilleuse();
+
 
 //INTERRUPT jack audio inserted
 void jackChangeInterrupt() {
@@ -341,6 +355,18 @@ void intExpIoSw9() {
 
 
 
+void setup() {
+  setup_veilleuse();
+}
+
+
+
+void loop() {
+  loop_veilleuse();
+}
+
+
+
 /*
   ___________________________________ _____________ 
  /   _____/\_   _____/\__    ___/    |   \______   \
@@ -351,22 +377,13 @@ void intExpIoSw9() {
 //setup init
 --------------------------------------------------------------------------------------------
 */
-void setup() {
+void setup_veilleuse() {
   //auto maintain power of the board when start
   //DO activate when R22 100K remove
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
   digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
   delay(1000);
 
-  //  HWSerial.begin(2000000);
-  //  HWSerial.setDebugOutput(true);
-  //
-  //  USB.onEvent(usbEventCallback);
-  //  MSC_Update.onEvent(usbEventCallback);
-  //  MSC_Update.begin();
-  //  USBSerial.begin();
-  //  USB.begin();
-  //
   Serial.begin(2000000);  //uart debug:2000000   uart_usb_otg:115200
   delay(20);
   //while (!Serial) {
@@ -504,30 +521,6 @@ void setup() {
   //start animation
   fadeInLed();
 
-  //not present on v2.0
-  // Serial.println("init rotary");
-  // pinMode(ROTARY_ENCODER_A_PIN, INPUT_PULLUP);
-  // pinMode(ROTARY_ENCODER_B_PIN, INPUT_PULLUP);
-  // pinMode(ROTARY_ENCODER_BUTTON_PIN, INPUT_PULLUP);
-
-  // //we must initialize rotary encoder
-  // rotaryEncoder.begin();
-  // rotaryEncoder.setup(readEncoderISR);
-  // //set boundaries and if values should cycle or not
-  // //in this example we will set possible values between 0 and 1000;
-  // bool circleValues = true;
-  // rotaryEncoder.setBoundaries(0, CYCLE_ROT, circleValues);  //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
-
-  // /*Rotary acceleration introduced 25.2.2021.
-  //    in case range to select is huge, for example - select a value between 0 and 1000 and we want 785
-  //    without accelerateion you need long time to get to that number
-  //    Using acceleration, faster you turn, faster wil
-  //    l the value raise.
-  //    For fine tuning slow down.
-  // */
-  // //rotaryEncoder.disableAcceleration(); //acceleration is now enabled by default - disable if you dont need it
-  // rotaryEncoder.setAcceleration(1);  //250 or set the value - larger number = more accelearation; 0 or 1 means disabled acceleration
-
   ulong_time_picture = millis() + TIME_PICTURE_END;
 
   //gain audio on boot
@@ -537,18 +530,14 @@ void setup() {
   // Serial.println("gain:6dB");  //GAIN_SLOT=VDD=3.3V -> 6dB
   // pinMode(I2S_GAIN, OUTPUT);
   // digitalWrite(I2S_GAIN, HIGH);
-
   // Serial.println("gain:9dB");  //GAIN_SLOT=floating input -> 9dB
   // pinMode(I2S_GAIN, INPUT);
-
   // Serial.println("gain:12dB");  //GAIN_SLOT=GND -> 12dB
   // pinMode(I2S_GAIN, OUTPUT);
   // digitalWrite(I2S_GAIN, LOW);
-
   // Serial.println("gain:15dB");  //GAIN_SLOT=Pull-down GND -> 15 dB
   // pinMode(I2S_GAIN, INPUT_PULLDOWN);
 
-  //audio web radio
   //enable AUDIO
   if (DEBUG_UART == 1) {
     // delay(2000);
@@ -602,7 +591,7 @@ void setup() {
 
   if (DEBUG_UART == 1) {
     //delay(2000);
-    Serial.println("buton play next");
+    Serial.println("button play next");
   }
   //int button play next
   pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
@@ -659,19 +648,19 @@ void setup() {
   //init switch 9 pos emotion
   intNumeroDossier = readSwitchEmo(1);  //1 direct read  0:wait interrupt for reading
 
-  //   // Set disk vendor id, product id and revision with string up to 8, 16, 4 characters respectively
-  //   usb_msc.setID("Mandalou", "SDCard", "1.0");
+  // // Set disk vendor id, product id and revision with string up to 8, 16, 4 characters respectively
+  // usb_msc.setID("Mandalou", "SDCard", "1.0");
 
+  // // Set read write callback
+  // usb_msc.setReadWriteCallback(msc_read_cb, msc_write_cb, msc_flush_cb);
 
-  //   // Set read write callback
-  //   usb_msc.setReadWriteCallback(msc_read_cb, msc_write_cb, msc_flush_cb);
+  // // Still initialize MSC but tell usb stack that MSC is not ready to read/write
+  // // If we don't initialize, board will be enumerated as CDC only
+  // usb_msc.setUnitReady(false);
 
-  //   // Still initialize MSC but tell usb stack that MSC is not ready to read/write
-  //   // If we don't initialize, board will be enumerated as CDC only
-  //   usb_msc.setUnitReady(false);
   //   usb_msc.begin();
 
-  //   if (!sd.begin(SD_CS, SD_SCK_MHZ(50))) {
+  //   if (!sd.begin(SD_CS2, SD_SCK_MHZ(50))) {
   //     Serial.println("initialization failed. Things to check:");
   //     Serial.println("* is a card inserted?");
   //     Serial.println("* is your wiring correct?");
@@ -695,7 +684,7 @@ void setup() {
   //   // MSC is ready for read/write
   //   usb_msc.setUnitReady(true);
 
-  //   fs_changed = true;  // to print contents initially
+  //   fs_changed = false;  // to print contents initially
 }
 
 
@@ -710,7 +699,7 @@ void setup() {
 //main loop
 --------------------------------------------------------------------------------------------
 */
-void loop() {
+void loop_veilleuse() {
   nowTimeMillis = millis();
   ulong_time_now = millis();
 
@@ -798,7 +787,7 @@ void loop() {
       fadeOutLed();
 
       Serial.println("POWER OFF");
-      for (int ii = 10; ii >= 0; ii--) {
+      for (ii = 10; ii >= 0; ii--) {
         Serial.println(ii);
         delay(1000);
       }
@@ -1202,7 +1191,6 @@ void change_song(void) {
   sprintf(local_name_directory, "/%02d/%02d/%03d.mp3", intNumeroDossier, intthemeChoice, (nextSong + 1));
   audio.connecttoSD(local_name_directory);
   Serial.println(local_name_directory);
-
 }
 
 
@@ -1305,7 +1293,7 @@ void readBatLevel(void) {
 
 void fadeInLed(void) {
   powerOnLed();
-  for (int ii = 10; ii < 150; ii = ii + 10) {
+  for (ii = 10; ii < 150; ii = ii + 10) {
     for (i = 0; i < NUM_LEDS2; i++) {
       leds2[i] = CRGB(0, 0, ii);
     }
@@ -1330,7 +1318,7 @@ void fadeOutLed(void) {
   }
   FastLED.show();
   delay(1000);
-  for (int ii = 140; ii >= 0; ii = ii - 10) {
+  for (ii = 140; ii >= 0; ii = ii - 10) {
 
     for (i = 0; i < NUM_LEDS2; i++) {
       leds2[i] = CRGB(0, 0, ii);
@@ -1566,7 +1554,192 @@ void changeGainJack(void) {
   }
 }
 
+
+
 /*
+ ____ ___  ___________________            __  .__        __    
+|    |   \/   _____/\______   \   _______/  |_|__| ____ |  | __
+|    |   /\_____  \  |    |  _/  /  ___/\   __\  |/ ___\|  |/ /
+|    |  / /        \ |    |   \  \___ \  |  | |  \  \___|    < 
+|______/ /_______  / |______  / /____  > |__| |__|\___  >__|_ \
+                 \/         \/       \/               \/     \/
+//USB key function
+--------------------------------------------------------------------------------------------
+*/
+
+// the setup function runs once when you press reset or power the board
+void setup_usb() {
+
+  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+  digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
+  delay(50);
+
+  Serial.begin(2000000);
+  //while (!Serial) delay(10);  // wait for native usb
+
+  //init 4 leds
+  FastLED.addLeds<NEOPIXEL, DATA_PIN2>(leds2, NUM_LEDS2);  // GRB ordering is assumed
+  FastLED.setBrightness(BRIGHTNESS);
+
+  for (ii = 0; ii < NUM_LEDS2; ii++) {
+    leds2[ii] = CRGB(0, 0, 0);
+  }
+  FastLED.show();
+
+  delay(100);
+  Serial.println("Test Mass Storage SD Card Mandalou");
+
+  delay(200);
+
+  //pinMode(LED_BUILTIN, OUTPUT);
+  //SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CHIP_SELECT_PIN); //ajouter pour check pin spi
+  SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, SD_CS);
+
+  // Set disk vendor id, product id and revision with string up to 8, 16, 4 characters respectively
+  usb_msc.setID("Mandalou", "SDCard", "1.0");
+
+
+  // Set read write callback
+  usb_msc.setReadWriteCallback(msc_read_cb, msc_write_cb, msc_flush_cb);
+
+  // Still initialize MSC but tell usb stack that MSC is not ready to read/write
+  // If we don't initialize, board will be enumerated as CDC only
+  usb_msc.setUnitReady(false);
+  usb_msc.begin();
+
+
+  Serial.print("\nInitializing SD card ... ");
+  //Print pins to see where wiring SDs (pin by default)
+  Serial.print("SCK:");
+  Serial.println(SCK);
+  Serial.print("MISO:");
+  Serial.println(MISO);
+  Serial.print("MOSI:");
+  Serial.println(MOSI);
+  //Serial.print("SS:"); Serial.println(SS)
+
+  Serial.print("CS = ");
+  Serial.println(SD_CS);
+
+  // SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CHIP_SELECT_PIN); //ajouter pour check pin spi
+
+  if (!sd.begin(SD_CS, SD_SCK_MHZ(50))) {
+    Serial.println("initialization failed. Things to check:");
+    Serial.println("* is a card inserted?");
+    Serial.println("* is your wiring correct?");
+    Serial.println("* did you change the chipSelect pin to match your shield or module?");
+    while (1) delay(1);
+  }
+
+  // Size in blocks (512 bytes)
+#if SD_FAT_VERSION >= 20000
+  uint32_t block_count = sd.card()->sectorCount();
+#else
+  uint32_t block_count = sd.card()->cardSize();
+#endif
+
+  Serial.print("Volume size (MB):  ");
+  Serial.println((block_count / 2) / 1024);
+
+  // Set disk size, SD block size is always 512
+  usb_msc.setCapacity(block_count, 512);
+
+  // MSC is ready for read/write
+  usb_msc.setUnitReady(true);
+
+  fs_changed = true;  // to print contents initially
+
+  nowTimeMillis = millis();
+  timeoutPressButtonLight = millis() + LONG_PRESS;
+}
+
+void loop_usb() {
+  nowTimeMillis = millis();
+
+  //activate detection button
+  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
+  lightLevel = digitalRead(PIN_POWER_BOARD_SWITCH_LIGHT);
+
+  //allow power
+  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+  digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
+
+
+  if (lightLevel == 0) {
+    timeoutPressButtonLight = millis() + LONG_PRESS;
+  }
+
+  if (millis() > timeoutPressButtonLight) {
+    Serial.println("OFF");
+
+    leds2[0] = CRGB(0, 0, 0);
+    leds2[1] = CRGB(0, 0, 0);
+    leds2[2] = CRGB(0, 0, 0);
+    leds2[3] = CRGB(0, 0, 0);
+    for (jj = 90; jj > 0; jj = jj - 10) {
+      {
+        for (ii = 0; ii < NUM_LEDS2; ii++) {
+          leds2[ii] = CRGB(jj, 0, 0);
+        }
+        FastLED.show();
+        delay(100);
+      }
+    }
+
+    delay(4000);  //power off
+    pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+    digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+    delay(200);
+  }
+
+
+  leds2[0] = CRGB(0, 0, 0);
+  leds2[1] = CRGB(0, 0, 0);
+  leds2[2] = CRGB(0, 0, 0);
+  leds2[3] = CRGB(0, 0, 0);
+  ii++;
+  if (ii >= 4) ii = 0;
+  if (fs_changed) {
+    leds2[ii] = CRGB(90, 0, 0);
+  } else {
+    leds2[ii] = CRGB(0, 0, 90);
+  }
+  FastLED.show();
+  delay(100);
+
+  Serial.println(lightLevel);
+
+  /*
+  if (fs_changed) {
+    root.open("/");
+    Serial.println("SD contents:");
+
+    // Open next file in root.
+    // Warning, openNext starts at the current directory position
+    // so a rewind of the directory may be required.
+    while (file.openNext(&root, O_RDONLY)) {
+      file.printFileSize(&Serial);
+      Serial.write(' ');
+      file.printName(&Serial);
+      if (file.isDir()) {
+        // Indicate a directory.
+        Serial.write('/');
+      }
+      Serial.println();
+      file.close();
+    }
+
+    root.close();
+
+    Serial.println();
+
+    fs_changed = false;
+    delay(500);  // refresh every 0.5 second
+  }
+
+  */
+}
+
 // Callback invoked when received READ10 command.
 // Copy disk's data to buffer (up to bufsize) and
 // return number of copied bytes (must be multiple of block size)
@@ -1615,4 +1788,3 @@ void msc_flush_cb(void) {
 
   // digitalWrite(LED_BUILTIN, LOW);
 }
-*/
