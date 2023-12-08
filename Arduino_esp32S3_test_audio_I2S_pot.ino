@@ -39,6 +39,8 @@
 #include "SdFat.h"
 #include "Adafruit_TinyUSB.h"
 
+#include <esp_task_wdt.h>
+
 /*
 ________  ______________________.___ _______  ___________
 \______ \ \_   _____/\_   _____/|   |\      \ \_   _____/
@@ -134,6 +136,8 @@ Audio audio;
 #define DATA_PIN2 21
 #define CLOCK_PIN 13  //not use
 
+//time watchdog
+#define WDT_TIMEOUT 10  //2 seconds WDT
 
 
 /*
@@ -179,7 +183,9 @@ Adafruit_USBD_MSC usb_msc;
 // Set to true when PC write to flash
 bool fs_changed;
 
-
+//Memoire RTC mode low power et reboot
+RTC_DATA_ATTR int bootMode=0;  //0:normal audio 1:usb key
+int localBootMode=0;
 
 //test variables
 int int_test_volume = 0;
@@ -205,10 +211,12 @@ unsigned long updateAdcRead = 0;
 unsigned long updateLogUart = 0;
 unsigned long CheckTimeJackInserted = 0;
 unsigned long timeoutPressButtonLight = 0;
-unsigned long lastDebounceTimePlay = 0;  // the last time the output pin was toggled
-unsigned long lastDebounceTimeNext = 0;  // the last time the output pin was toggled
-unsigned long debounceDelay = 50;        // the debounce time; increase if the output flickers
-unsigned long longPressButton = 1500;    // long time pressure button
+unsigned long lastDebounceTimePlay = 0;      // the last time the output pin was toggled
+unsigned long lastDebounceTimeNext = 0;      // the last time the output pin was toggled
+unsigned long lastDebounceTimePlayNext = 0;  // the last time the output pin was toggled
+int longPressPlayNext = 2000;                // press PLAY NEXT during 2 secondes
+unsigned long debounceDelay = 50;            // the debounce time; increase if the output flickers
+unsigned long longPressButton = 1500;        // long time pressure button
 
 //button play/pause next
 int readButPlay = 0;
@@ -333,10 +341,22 @@ int32_t msc_read_cb(uint32_t lba, void *buffer, uint32_t bufsize);
 //setup and loop modes
 void setup_usb();
 void loop_usb();
-void loop_veilleuse();
 void setup_veilleuse();
+void loop_veilleuse();
+
+void print_wakeup_reason();
 
 
+/*
+.___        __                                    __          
+|   | _____/  |_  __________________ __ _________/  |_  ______
+|   |/    \   __\/ __ \_  __ \_  __ \  |  \____ \   __\/  ___/
+|   |   |  \  | \  ___/|  | \/|  | \/  |  /  |_> >  |  \___ \ 
+|___|___|  /__|  \___  >__|   |__|  |____/|   __/|__| /____  >
+         \/          \/                   |__|             \/ 
+//interrupt functions
+--------------------------------------------------------------------------------------------
+*/
 //INTERRUPT jack audio inserted
 void jackChangeInterrupt() {
   jackInsertedCnt++;
@@ -355,12 +375,61 @@ void intExpIoSw9() {
 
 
 
+/*
+               __                
+  ______ _____/  |_ __ ________  
+ /  ___// __ \   __\  |  \____ \ 
+ \___ \\  ___/|  | |  |  /  |_> >
+/____  >\___  >__| |____/|   __/ 
+     \/     \/           |__|    
+//Init main application
+--------------------------------------------------------------------------------------------
+*/
 void setup() {
+  //auto maintain power of the board when start
+  //DO activate when R22 100K remove
+  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+  digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
+  delay(200);
+
+  ++bootMode;  //flip
+
+  Serial.begin(2000000);  //uart debug:2000000   uart_usb_otg:115200
+  delay(20);
+  //while (!Serial) {
+  // }
+  Serial.println("************************************************************");
+  if (bootMode % 2 == 0) {
+    //0:normal audio 1:usb key
+    Serial.print("START PROGRAM MODE AUDIO -mode:");
+  } else {
+    //0:normal audio 1:usb key
+    Serial.println("START PROGRAM USB KEY  -mode:");
+  }
+  Serial.println(bootMode);
+  Serial.println("************************************************************");
+
+  print_wakeup_reason();
+
+  //watchdog
+  esp_task_wdt_init(WDT_TIMEOUT, true);  //enable panic so ESP32 restarts
+  esp_task_wdt_add(NULL);                //add current thread to WDT watch
+
   setup_veilleuse();
 }
 
 
 
+/*
+.__                        
+|  |   ____   ____ ______  
+|  |  /  _ \ /  _ \\____ \ 
+|  |_(  <_> |  <_> )  |_> >
+|____/\____/ \____/|   __/ 
+                   |__|    
+//Main loop application
+--------------------------------------------------------------------------------------------
+*/
 void loop() {
   loop_veilleuse();
 }
@@ -368,29 +437,69 @@ void loop() {
 
 
 /*
-  ___________________________________ _____________ 
- /   _____/\_   _____/\__    ___/    |   \______   \
- \_____  \  |    __)_   |    |  |    |   /|     ___/
- /        \ |        \  |    |  |    |  / |    |    
-/_______  //_______  /  |____|  |______/  |____|    
-        \/         \/                               
-//setup init
+ __      __         __            .__        _____             
+/  \    /  \_____  |  | __ ____   |__| _____/ ____\____  ______
+\   \/\/   /\__  \ |  |/ // __ \  |  |/    \   __\/  _ \/  ___/
+ \        /  / __ \|    <\  ___/  |  |   |  \  | (  <_> )___ \ 
+  \__/\  /  (____  /__|_ \\___  > |__|___|  /__|  \____/____  >
+       \/        \/     \/    \/          \/                \/ 
+//Wakeup informations
+--------------------------------------------------------------------------------------------
+*/
+void print_wakeup_reason() {
+  esp_sleep_wakeup_cause_t source_reveil;
+
+  source_reveil = esp_sleep_get_wakeup_cause();
+
+  switch (source_reveil) {
+    case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Réveil causé par un signal externe avec RTC_IO"); break;
+    case ESP_SLEEP_WAKEUP_EXT1: Serial.println("Réveil causé par un signal externe avec RTC_CNTL"); break;
+    case ESP_SLEEP_WAKEUP_TIMER: Serial.println("Réveil causé par un timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD: Serial.println("Réveil causé par un touchpad"); break;
+    default: Serial.printf("Réveil pas causé par le Deep Sleep: %d\n", source_reveil); break;
+  }
+}
+
+
+
+/*
+               __                                              
+  ______ _____/  |_ __ ________     ____   ___________  _____  
+ /  ___// __ \   __\  |  \____ \   /    \ /  _ \_  __ \/     \ 
+ \___ \\  ___/|  | |  |  /  |_> > |   |  (  <_> )  | \/  Y Y  \
+/____  >\___  >__| |____/|   __/  |___|  /\____/|__|  |__|_|  /
+     \/     \/           |__|          \/                   \/                            
+//setup init normal mode audio
 --------------------------------------------------------------------------------------------
 */
 void setup_veilleuse() {
-  //auto maintain power of the board when start
-  //DO activate when R22 100K remove
-  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
-  digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
-  delay(1000);
+  // //auto maintain power of the board when start
+  // //DO activate when R22 100K remove
+  // pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+  // digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
+  // delay(1000);
 
-  Serial.begin(2000000);  //uart debug:2000000   uart_usb_otg:115200
-  delay(20);
-  //while (!Serial) {
-  // }
-  Serial.println("************************************************************");
-  Serial.println("START PROGRAM");
-  Serial.println("************************************************************");
+  // Serial.begin(2000000);  //uart debug:2000000   uart_usb_otg:115200
+  // delay(20);
+  // //while (!Serial) {
+  // // }
+  // Serial.println("************************************************************");
+  // Serial.println("START PROGRAM");
+  // Serial.println("************************************************************");
+
+  Serial.println("init neopixel");
+
+  //power supply led neopixel
+  powerOffLed();
+  delay(10);
+  powerOnLed();
+
+  //init 4 leds
+  FastLED.addLeds<NEOPIXEL, DATA_PIN2>(leds2, NUM_LEDS2);  // GRB ordering is assumed
+  FastLED.setBrightness(BRIGHTNESS);
+
+  //start animation
+  fadeInLed();
 
   //ADC
   //set the resolution to 12 bits (0-4096)
@@ -508,18 +617,6 @@ void setup_veilleuse() {
     WiFi.mode(WIFI_OFF);
 
   }  //wifi define
-
-  Serial.println("init neopixel");
-
-  //power supply led neopixel
-  powerOnLed();
-
-  //init 4 leds
-  FastLED.addLeds<NEOPIXEL, DATA_PIN2>(leds2, NUM_LEDS2);  // GRB ordering is assumed
-  FastLED.setBrightness(BRIGHTNESS);
-
-  //start animation
-  fadeInLed();
 
   ulong_time_picture = millis() + TIME_PICTURE_END;
 
@@ -685,6 +782,8 @@ void setup_veilleuse() {
   //   usb_msc.setUnitReady(true);
 
   //   fs_changed = false;  // to print contents initially
+
+  lastDebounceTimePlayNext = millis() + longPressPlayNext;
 }
 
 
@@ -790,7 +889,9 @@ void loop_veilleuse() {
       for (ii = 10; ii >= 0; ii--) {
         Serial.println(ii);
         delay(1000);
+        esp_task_wdt_reset();
       }
+
       Serial.println("OFF");
       pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
       digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
@@ -803,6 +904,31 @@ void loop_veilleuse() {
   readButPlay = digitalRead(PIN_BUTTON_PLAY);
   readButNext = digitalRead(PIN_BUTTON_NEXT);
 
+  //test press PLAY NEXT same time  BOOT MODE
+  if (readButPlay == 0 && readButNext == 0) {
+    if ((millis()) > lastDebounceTimePlayNext) {
+      //reboot and change boot type
+      //++bootMode;  //flip
+      Serial.println("Reboot mode :" + String(bootMode));
+      powerOnLed();
+      while (true) {
+        leds2[0] = CRGB(0, 0, 0);
+        leds2[1] = CRGB(0, 0, 0);
+        leds2[2] = CRGB(0, 0, 0);
+        leds2[3] = CRGB(0, 0, 0);
+        ii++;
+        if (ii >= 4) ii = 0;
+        leds2[ii] = CRGB(0, 90, 0);
+        FastLED.show();
+        delay(100);
+      }  //for watchdog
+
+      //esp_task_wdt_reset();
+    }
+  } else {
+    lastDebounceTimePlayNext = millis() + longPressPlayNext;
+    esp_task_wdt_reset();
+  }
 
   if (readButPlay != lastButtonPlay) {
     // reset the debouncing timer
@@ -1257,6 +1383,8 @@ void logUart(void) {
     Serial.printf("%d,", analogBatVoltage);
     Serial.printf("%d,", chargeStatus);
 
+    Serial.printf("%d,", bootMode);
+
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
   }
@@ -1299,6 +1427,7 @@ void fadeInLed(void) {
     }
     FastLED.show();
     delay(100);
+    esp_task_wdt_reset();
   }
   delay(1000);
   for (i = 0; i < NUM_LEDS2; i++) {
@@ -1325,6 +1454,7 @@ void fadeOutLed(void) {
     }
     FastLED.show();
     delay(100);
+    esp_task_wdt_reset();
   }
   powerOffLed();
 }
@@ -1683,10 +1813,14 @@ void loop_usb() {
         }
         FastLED.show();
         delay(100);
+        esp_task_wdt_reset();
       }
     }
 
-    delay(4000);  //power off
+    for (ii = 0; ii < 4; ii++) {
+      delay(1000);  //power off
+      esp_task_wdt_reset();
+    }
     pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
     digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
     delay(200);
