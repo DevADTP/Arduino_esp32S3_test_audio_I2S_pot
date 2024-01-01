@@ -184,8 +184,8 @@ Adafruit_USBD_MSC usb_msc;
 bool fs_changed;
 
 //Memoire RTC mode low power et reboot
-RTC_DATA_ATTR int bootMode=0;  //0:normal audio 1:usb key
-int localBootMode=0;
+RTC_DATA_ATTR int bootMode = 0;  //0:normal audio 1:usb key
+int localBootMode = 0;
 
 //test variables
 int int_test_volume = 0;
@@ -234,8 +234,8 @@ int nextSong = 0;
 int intDetectExpIoSw9 = 0;
 int intCmptRotSw9 = 0;
 int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
-int intMatTheme[8] = { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 };
-int intVarAdc = 10;
+int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2947, 3530 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+int intVarAdc = 50;                                                     //ecart adc 10 -> 50
 
 //button light
 int buttonlightLevel = 0;
@@ -247,7 +247,7 @@ int lightLevel = 0;
 int analogSwitchTheme = 0;
 int analogSwitchuser = 0;
 int analogJackInserted = 0;
-int analogBatVoltage = 0;  //PIN_BAT_MEAS
+long int analogBatVoltage = 0;  //PIN_BAT_MEAS
 int matAnalogBatVoltage[16];
 long int sumBatVoltage = 0;
 int indiceBatVoltage = 0;
@@ -310,6 +310,7 @@ void change_song(void);
 void logUart(void);
 int themeSelect(void);
 void readBatLevel(void);
+void ledBatteryLevel(void);
 void set_tick_tock(void);
 void powerOffLed(void);
 void powerOnLed(void);
@@ -499,7 +500,7 @@ void setup_veilleuse() {
   FastLED.setBrightness(BRIGHTNESS);
 
   //start animation
-  fadeInLed();
+  //  fadeInLed();
 
   //ADC
   //set the resolution to 12 bits (0-4096)
@@ -623,7 +624,6 @@ void setup_veilleuse() {
   //gain audio on boot
   Serial.println("gain:3dB");  //GAIN_SLOT=Pull-up 3.3V -> 3 dB
   pinMode(I2S_GAIN, INPUT_PULLUP);
-
   // Serial.println("gain:6dB");  //GAIN_SLOT=VDD=3.3V -> 6dB
   // pinMode(I2S_GAIN, OUTPUT);
   // digitalWrite(I2S_GAIN, HIGH);
@@ -734,6 +734,30 @@ void setup_veilleuse() {
   for (i = 0; i < 16; i++) {
     readBatLevel();
   }
+
+  //Led light on startup depending battery level
+  ledBatteryLevel();
+
+  //led with battery level green >4.1V  yellow >3.8V  red <3.5V
+  // while (1) {
+  //   ledBatteryLevel();
+
+  //   //enable read battery
+  //   digitalWrite(PIN_BAT_MEAS_EN, LOW);  //HIGH:read bat off LOW:read bat on
+  //   delay(1);
+  //   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  //   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  //   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  //   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  //   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  //   //disable read battery
+  //   digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
+  //   delay(1);
+  //   // Serial.print(",");
+  //   // Serial.print(999999999999);
+  //   // Serial.print(",");
+  //   // Serial.println(analogBatVoltage);
+  // }
 
   if (DEBUG_UART == 1) {
     //delay(2000);
@@ -1394,8 +1418,8 @@ void logUart(void) {
 
 void readBatLevel(void) {
   //enable read battery
-  digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
-  //delay(1);
+  digitalWrite(PIN_BAT_MEAS_EN, LOW);  //HIGH:read bat off LOW:read bat on
+  delay(1);
 
   //Battery voltage adc@3.1V
   analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
@@ -1407,14 +1431,74 @@ void readBatLevel(void) {
   //disable read bat
   //digitalWrite(PIN_BAT_MEAS_EN, LOW);  //HIGH:read bat off LOW:read bat on
 
+  //for (int tt = 0; tt < 16; tt++) {
   indiceBatVoltage++;
+  // analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
+  // delay(1);
   sumBatVoltage = (sumBatVoltage - matAnalogBatVoltage[indiceBatVoltage % 16]);
   sumBatVoltage = analogBatVoltage + sumBatVoltage;
 
   matAnalogBatVoltage[indiceBatVoltage % 16] = analogBatVoltage;
+  // }
+
+  // for (int tt = 0; tt < 16; tt++) {
+  //   Serial.print(",");
+  //   Serial.print(matAnalogBatVoltage[tt]);
+  // }
+
+  // Serial.print(",");
+  // Serial.print(sumBatVoltage);
 
   //analogBatVoltage = analogBatVoltage * 100 / 695;  //ratio Vout/Vin=0.6
-  analogBatVoltage = (sumBatVoltage >> 4) * 100 / 695;  //ratio Vout/Vin=0.6
+  analogBatVoltage = (sumBatVoltage >> 4) * 825 / 6144;  //Vbat=Vadc*1,6*100
+
+  // Serial.print(",");
+  //Serial.println(analogBatVoltage);
+
+  digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
+}
+
+
+
+void ledBatteryLevel(void) {
+  int colorR = 0;
+  int colorG = 0;
+  int colorB = 0;
+
+  readBatLevel();
+
+  if (analogBatVoltage < 350) {
+    colorR = 1;
+    colorG = 0;
+    colorB = 0;
+  } else {
+    if (analogBatVoltage < 390) {
+      colorR = 0;
+      colorG = 1;
+      colorB = 0;
+    } else {
+      colorR = 0;
+      colorG = 1;
+      colorB = 0;
+    }
+  }
+
+  powerOnLed();
+  for (ii = 10; ii < 150; ii = ii + 10) {
+    for (i = 0; i < NUM_LEDS2; i++) {
+      leds2[i] = CRGB(colorR * ii, colorG * ii, colorB * ii);
+    }
+    FastLED.show();
+    delay(100);
+    esp_task_wdt_reset();
+  }
+  delay(1000);
+  for (i = 0; i < NUM_LEDS2; i++) {
+    leds2[i] = CRGB(0, 0, 0);
+  }
+  FastLED.show();
+  delay(10);
+  powerOffLed();
 }
 
 
