@@ -316,7 +316,7 @@ void powerOffLed(void);
 void powerOnLed(void);
 void fadeOutLed(void);
 void fadeInLed(void);
-void activeLed(int red, int green, int blue, int active);
+void activeLed(int red, int green, int blue, int brighness, int active);
 int readLightButton(void);
 int readSwitchEmo(int bypassInt);
 void changeDirEmotion(int intDirEmotion);
@@ -859,7 +859,7 @@ void loop_veilleuse() {
     analogSwitchuser = analogRead(PIN_SWITCH_USER);
     //Serial.printf("Switch user = %d\n", analogSwitchuser);
 
-    //Battery voltage adc@3.1V
+    //Battery voltage adc@3.3V level 4.2V, 3.9V and 3.5V low limit
     readBatLevel();
 
     //Charge status
@@ -883,17 +883,37 @@ void loop_veilleuse() {
     changeDirEmotion(intNumeroDossier);
   }
 
-  //read button light on pwer ohh if long press
+  //read button light on pwer off if long press
   buttonlightLevel = readLightButton();
 
   if (buttonlightLevel != oldButtonlightLevel) {
 
     if (oldButtonlightLevel == 0 && buttonlightLevel == 1) {
-      flipLight = flipLight ^ 1;
-      if (flipLight == 1)
-        activeLed(0, 150, 0, 1);  // red,  green,  blue,  active
-      else
-        activeLed(0, 0, 0, 0);  // red,  green,  blue,  active
+      //flipLight = flipLight ^ 1;
+      flipLight++;
+      if (flipLight >= 4) flipLight = 0;
+      switch (flipLight) {
+        case 1:
+          // light warm low
+          activeLed(255, 255, 70, 50, 1);  // red,  green,  blue,  brighness, active
+          break;
+        case 2:
+          // light warm medium
+          activeLed(255, 255, 70, 150, 1);   // red,  green,  blue,  brighness, active
+          break;
+        case 3:
+          // light warm high
+          activeLed(255, 214, 170, 200, 1);  // red,  green,  blue,  brighness, active
+          break;
+        default:
+          // light off
+          activeLed(0, 0, 0, 200, 0);  // red,  green,  blue,  active
+          break;
+      }
+      // if (flipLight == 1)
+      //   activeLed(0, 150, 0, 200, 1);  // red,  green,  blue,  brighness, active
+      // else
+      //   activeLed(0, 0, 0, 200, 0);    // red,  green,  blue,  brighness, active
       //Serial.println(flipLight);
     } else {
       //Serial.println(buttonlightLevel);
@@ -1545,7 +1565,7 @@ void fadeOutLed(void) {
 
 
 
-void activeLed(int red, int green, int blue, int active) {
+void activeLed(int red, int green, int blue, int brighness, int active) {
   for (i = 0; i < NUM_LEDS2; i++) {
     if (active == 1) {
       powerOnLed();
@@ -1555,6 +1575,7 @@ void activeLed(int red, int green, int blue, int active) {
     }
   }
   delay(10);
+  FastLED.setBrightness(brighness);
   FastLED.show();
 }
 
