@@ -43,6 +43,9 @@
 
 #include <ArduinoJson.h>
 
+#include <Preferences.h>
+
+
 /*
 ________  ______________________.___ _______  ___________
 \______ \ \_   _____/\_   _____/|   |\      \ \_   _____/
@@ -192,7 +195,7 @@ bool fs_changed;
 //RTC_DATA_ATTR int bootMode = 0;  //0:normal audio 1:usb key
 int localBootMode = 0;
 
-static int bootMode2 = 0;
+static unsigned int bootMode2 = 0;
 
 //test variables
 int int_test_volume = 0;
@@ -306,7 +309,8 @@ volatile uint8_t tick_tock = 1;
 DynamicJsonDocument jsonConfig(1024);
 String jsonString;
 
-
+//preference for boot
+Preferences preferences;
 
 /*
 ___________                   __  .__                      
@@ -408,18 +412,36 @@ void setup() {
   //++bootMode;  //flip
   //++bootMode2;
 
+  //preference on flash data etain after reboot
+  preferences.begin("my-app", false);
+  // Remove all preferences under the opened namespace
+  //preferences.clear();
+  // Or remove the counter key only
+  //preferences.remove("counter");
+  // Get the counter value, if the key does not exist, return a default value of 0
+  // Note: Key name is limited to 15 chars.
+  bootMode2 = preferences.getUInt("bootmode", 0);
+  // Increase counter by 1
+  //bootMode2++;
+
+  // Store the counter to the Preferences
+  //preferences.putUInt("bootmode", bootMode2);
+
+  // Close the Preferences
+  preferences.end();
+
   Serial.begin(2000000);  //uart debug:2000000   uart_usb_otg:115200
   delay(20);
 
   //while (!Serial) {
   // }
   Serial.println("************************************************************");
-  if (bootMode2 == 0) {
+  if ((bootMode2 % 2) == 0) {
     //0:normal audio 1:usb key
-    Serial.print("START PROGRAM MODE AUDIO -mode normal:");
+    Serial.print("START PROGRAM MODE AUDIO -mode usb:");
   } else {
     //0:normal audio 1:usb key
-    Serial.print("START PROGRAM USB KEY  -mode usb:");
+    Serial.print("START PROGRAM USB KEY  -mode normal:");
   }
   Serial.println(bootMode2);
   Serial.println("************************************************************");
@@ -430,11 +452,11 @@ void setup() {
   esp_task_wdt_init(WDT_TIMEOUT, true);  //enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);                //add current thread to WDT watch
 
-  // if (bootMode2 == 0) {
-  //   setup_veilleuse();
-  // } else {
-  setup_usb();
-  // }
+  if ((bootMode2 % 2) == 0) {
+    setup_veilleuse();
+  } else {
+    setup_usb();
+  }
 }
 
 
@@ -450,12 +472,11 @@ void setup() {
 --------------------------------------------------------------------------------------------
 */
 void loop() {
-  // if (bootMode2 == 0) {
-  //   loop_veilleuse();
-  // } else {
-  bootMode2 = 0;
-  loop_usb();
-  // }
+  if ((bootMode2 % 2) == 0) {
+    loop_veilleuse();
+  } else {
+    loop_usb();
+  }
 }
 
 
@@ -987,9 +1008,28 @@ void loop_veilleuse() {
       serializeJson(jsonConfig, jsonString);
       Serial.println(jsonString);
 
+      //save on preference flash
+      //preference on flash data etain after reboot
+      preferences.begin("my-app", false);
+      // Remove all preferences under the opened namespace
+      //preferences.clear();
+      // Or remove the counter key only
+      //preferences.remove("counter");
+      // Get the counter value, if the key does not exist, return a default value of 0
+      // Note: Key name is limited to 15 chars.
+      //bootMode2 = preferences.getUInt("bootmode", 0);
+      // Increase counter by 1
+      //bootMode2++;
+
+      // Store the counter to the Preferences
+      preferences.putUInt("bootmode", bootMode2);
+
+      // Close the Preferences
+      preferences.end();
+
       powerOnLed();
-      //while (true) {
-      for (int ki = 0; ki < 12; ki++) {
+      while (true) {
+        //for (int ki = 0; ki < 12; ki++) {
         leds2[0] = CRGB(0, 0, 0);
         leds2[1] = CRGB(0, 0, 0);
         leds2[2] = CRGB(0, 0, 0);
@@ -1009,7 +1049,7 @@ void loop_veilleuse() {
       delay(100);
 
       //boot usb
-      setup();
+      //setup();
 
       //esp_task_wdt_reset();
     }
@@ -1861,6 +1901,10 @@ void setup_usb() {
   digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
   delay(50);
 
+  //int button play next
+  pinMode(PIN_BUTTON_PLAY, INPUT_PULLUP);
+  pinMode(PIN_BUTTON_NEXT, INPUT_PULLUP);
+
   Serial.begin(2000000);
   //while (!Serial) delay(10);  // wait for native usb
 
@@ -1956,6 +2000,7 @@ void loop_usb() {
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
   digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
 
+  //POWER OFF
   if (lightLevel == 0) {
     timeoutPressButtonLight = millis() + LONG_PRESS;
   }
@@ -1999,7 +2044,7 @@ void loop_usb() {
     delay(200);
   }
 
-
+  //flash rotating led for usb mode
   if (millis() > timeoutRefreshLed) {
     timeoutRefreshLed = millis() + UPDATE_LED;
     leds2[0] = CRGB(0, 0, 0);
@@ -2018,6 +2063,79 @@ void loop_usb() {
 
     Serial.println(lightLevel);
   }
+
+
+  //detect change mode pressing PLAY NEXT in same time
+  //PART button play change power audio
+  readButPlay = digitalRead(PIN_BUTTON_PLAY);
+  readButNext = digitalRead(PIN_BUTTON_NEXT);
+
+  //test press PLAY NEXT same time  BOOT MODE
+  if (readButPlay == 0 && readButNext == 0) {
+    if ((millis()) > lastDebounceTimePlayNext) {
+      //reboot and change boot type
+      //++bootMode;  //flip
+      //Serial.println("Reboot mode :" + String(bootMode));
+
+      ++bootMode2;
+      // Ajoutez des données au document JSON
+      jsonConfig["mode"] = "usb";  //normal ou usb
+      jsonConfig["Nb"] = bootMode2;
+
+      // convert json and print
+      serializeJson(jsonConfig, jsonString);
+      Serial.println(jsonString);
+
+      //save on preference flash
+      //preference on flash data etain after reboot
+      preferences.begin("my-app", false);
+      // Remove all preferences under the opened namespace
+      //preferences.clear();
+      // Or remove the counter key only
+      //preferences.remove("counter");
+      // Get the counter value, if the key does not exist, return a default value of 0
+      // Note: Key name is limited to 15 chars.
+      //bootMode2 = preferences.getUInt("bootmode", 0);
+      // Increase counter by 1
+      //bootMode2++;
+
+      // Store the counter to the Preferences
+      preferences.putUInt("bootmode", bootMode2);
+
+      // Close the Preferences
+      preferences.end();
+
+      powerOnLed();
+      while (true) {
+        //for (int ki = 0; ki < 12; ki++) {
+        leds2[0] = CRGB(0, 0, 0);
+        leds2[1] = CRGB(0, 0, 0);
+        leds2[2] = CRGB(0, 0, 0);
+        leds2[3] = CRGB(0, 0, 0);
+        ii++;
+        if (ii >= 4) ii = 0;
+        leds2[ii] = CRGB(0, 90, 0);
+        FastLED.show();
+        delay(100);
+      }  //for watchdog
+
+      leds2[0] = CRGB(0, 0, 0);
+      leds2[1] = CRGB(0, 0, 0);
+      leds2[2] = CRGB(0, 0, 0);
+      leds2[3] = CRGB(0, 0, 0);
+      FastLED.show();
+      delay(100);
+
+      //boot usb
+      //setup();
+
+      //esp_task_wdt_reset();
+    }
+  } else {
+    lastDebounceTimePlayNext = millis() + longPressPlayNext;
+    esp_task_wdt_reset();
+  }
+
 
   //wait other process
   delay(50);
