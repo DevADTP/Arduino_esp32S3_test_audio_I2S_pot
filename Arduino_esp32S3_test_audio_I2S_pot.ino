@@ -41,6 +41,8 @@
 
 #include <esp_task_wdt.h>
 
+#include <ArduinoJson.h>
+
 /*
 ________  ______________________.___ _______  ___________
 \______ \ \_   _____/\_   _____/|   |\      \ \_   _____/
@@ -93,6 +95,9 @@ ________  ______________________.___ _______  ___________
 
 //TIME long press button light
 #define LONG_PRESS 4000  //4 secondes
+
+//TIME refresh led usb mode
+#define UPDATE_LED 100  //100ms
 
 //potentiometre emotions
 #define PIN_INT_SW9 5
@@ -184,8 +189,10 @@ Adafruit_USBD_MSC usb_msc;
 bool fs_changed;
 
 //Memoire RTC mode low power et reboot
-RTC_DATA_ATTR int bootMode = 0;  //0:normal audio 1:usb key
+//RTC_DATA_ATTR int bootMode = 0;  //0:normal audio 1:usb key
 int localBootMode = 0;
+
+static int bootMode2 = 0;
 
 //test variables
 int int_test_volume = 0;
@@ -217,6 +224,7 @@ unsigned long lastDebounceTimePlayNext = 0;  // the last time the output pin was
 int longPressPlayNext = 2000;                // press PLAY NEXT during 2 secondes
 unsigned long debounceDelay = 50;            // the debounce time; increase if the output flickers
 unsigned long longPressButton = 1500;        // long time pressure button
+unsigned long timeoutRefreshLed = 0;         //timeout update led refresh
 
 //button play/pause next
 int readButPlay = 0;
@@ -293,6 +301,10 @@ int intWifiConnectRetry = 0;
 
 // flag to update serial; set in interrupt callback
 volatile uint8_t tick_tock = 1;
+
+//Json for config
+DynamicJsonDocument jsonConfig(1024);
+String jsonString;
 
 
 
@@ -393,21 +405,23 @@ void setup() {
   digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
   delay(200);
 
-  ++bootMode;  //flip
+  //++bootMode;  //flip
+  //++bootMode2;
 
   Serial.begin(2000000);  //uart debug:2000000   uart_usb_otg:115200
   delay(20);
+
   //while (!Serial) {
   // }
   Serial.println("************************************************************");
-  if (bootMode % 2 == 0) {
+  if (bootMode2 == 0) {
     //0:normal audio 1:usb key
-    Serial.print("START PROGRAM MODE AUDIO -mode:");
+    Serial.print("START PROGRAM MODE AUDIO -mode normal:");
   } else {
     //0:normal audio 1:usb key
-    Serial.println("START PROGRAM USB KEY  -mode:");
+    Serial.print("START PROGRAM USB KEY  -mode usb:");
   }
-  Serial.println(bootMode);
+  Serial.println(bootMode2);
   Serial.println("************************************************************");
 
   print_wakeup_reason();
@@ -416,7 +430,11 @@ void setup() {
   esp_task_wdt_init(WDT_TIMEOUT, true);  //enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);                //add current thread to WDT watch
 
-  setup_veilleuse();
+  // if (bootMode2 == 0) {
+  //   setup_veilleuse();
+  // } else {
+  setup_usb();
+  // }
 }
 
 
@@ -432,7 +450,12 @@ void setup() {
 --------------------------------------------------------------------------------------------
 */
 void loop() {
-  loop_veilleuse();
+  // if (bootMode2 == 0) {
+  //   loop_veilleuse();
+  // } else {
+  bootMode2 = 0;
+  loop_usb();
+  // }
 }
 
 
@@ -899,7 +922,7 @@ void loop_veilleuse() {
           break;
         case 2:
           // light warm medium
-          activeLed(255, 255, 70, 150, 1);   // red,  green,  blue,  brighness, active
+          activeLed(255, 255, 70, 150, 1);  // red,  green,  blue,  brighness, active
           break;
         case 3:
           // light warm high
@@ -953,9 +976,20 @@ void loop_veilleuse() {
     if ((millis()) > lastDebounceTimePlayNext) {
       //reboot and change boot type
       //++bootMode;  //flip
-      Serial.println("Reboot mode :" + String(bootMode));
+      //Serial.println("Reboot mode :" + String(bootMode));
+
+      ++bootMode2;
+      // Ajoutez des données au document JSON
+      jsonConfig["mode"] = "usb";  //normal ou usb
+      jsonConfig["Nb"] = bootMode2;
+
+      // convert json and print
+      serializeJson(jsonConfig, jsonString);
+      Serial.println(jsonString);
+
       powerOnLed();
-      while (true) {
+      //while (true) {
+      for (int ki = 0; ki < 12; ki++) {
         leds2[0] = CRGB(0, 0, 0);
         leds2[1] = CRGB(0, 0, 0);
         leds2[2] = CRGB(0, 0, 0);
@@ -966,6 +1000,16 @@ void loop_veilleuse() {
         FastLED.show();
         delay(100);
       }  //for watchdog
+
+      leds2[0] = CRGB(0, 0, 0);
+      leds2[1] = CRGB(0, 0, 0);
+      leds2[2] = CRGB(0, 0, 0);
+      leds2[3] = CRGB(0, 0, 0);
+      FastLED.show();
+      delay(100);
+
+      //boot usb
+      setup();
 
       //esp_task_wdt_reset();
     }
@@ -1404,7 +1448,7 @@ int themeSelect(int adcValue) {
 
 
 void logUart(void) {
-  //ADC theme | theme1-5 | ADC user | led_status | emotion | nb_files |volume0-21 | jack cnt | jack insert | bat voltage | charge status | PSRAM
+  //ADC theme | theme1-5 | ADC user | led_status | emotion | nb_files |volume0-21 | jack cnt | jack insert | bat voltage | charge status | bootMode | PSRAM
   if (millis() > updateLogUart) {
     updateLogUart = millis() + PERIOD_LOG_UART;
 
@@ -1427,7 +1471,9 @@ void logUart(void) {
     Serial.printf("%d,", analogBatVoltage);
     Serial.printf("%d,", chargeStatus);
 
-    Serial.printf("%d,", bootMode);
+    //Serial.printf("%d,", bootMode);
+
+    Serial.printf("%d,", bootMode2);
 
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
@@ -1805,6 +1851,12 @@ void changeGainJack(void) {
 // the setup function runs once when you press reset or power the board
 void setup_usb() {
 
+  //reset watchdog
+  esp_task_wdt_reset();
+
+  //POWER ON LED
+  powerOnLed();
+
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
   digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
   delay(50);
@@ -1832,7 +1884,6 @@ void setup_usb() {
 
   // Set disk vendor id, product id and revision with string up to 8, 16, 4 characters respectively
   usb_msc.setID("Mandalou", "SDCard", "1.0");
-
 
   // Set read write callback
   usb_msc.setReadWriteCallback(msc_read_cb, msc_write_cb, msc_flush_cb);
@@ -1886,10 +1937,16 @@ void setup_usb() {
 
   nowTimeMillis = millis();
   timeoutPressButtonLight = millis() + LONG_PRESS;
+
+  //reset watchdog
+  esp_task_wdt_reset();
 }
 
 void loop_usb() {
   nowTimeMillis = millis();
+
+  //reset watchdog
+  esp_task_wdt_reset();
 
   //activate detection button
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
@@ -1898,7 +1955,6 @@ void loop_usb() {
   //allow power
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
   digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
-
 
   if (lightLevel == 0) {
     timeoutPressButtonLight = millis() + LONG_PRESS;
@@ -1922,32 +1978,49 @@ void loop_usb() {
       }
     }
 
+    //LED OFF
+    leds2[0] = CRGB(0, 0, 0);
+    leds2[1] = CRGB(0, 0, 0);
+    leds2[2] = CRGB(0, 0, 0);
+    leds2[3] = CRGB(0, 0, 0);
+    FastLED.show();
+    delay(100);
+    //POWER ON LED
+    powerOffLed();
+
     for (ii = 0; ii < 4; ii++) {
       delay(1000);  //power off
       esp_task_wdt_reset();
     }
+
+    //POWER OFF
     pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
     digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
     delay(200);
   }
 
 
-  leds2[0] = CRGB(0, 0, 0);
-  leds2[1] = CRGB(0, 0, 0);
-  leds2[2] = CRGB(0, 0, 0);
-  leds2[3] = CRGB(0, 0, 0);
-  ii++;
-  if (ii >= 4) ii = 0;
-  if (fs_changed) {
-    leds2[ii] = CRGB(90, 0, 0);
-  } else {
-    leds2[ii] = CRGB(0, 0, 90);
+  if (millis() > timeoutRefreshLed) {
+    timeoutRefreshLed = millis() + UPDATE_LED;
+    leds2[0] = CRGB(0, 0, 0);
+    leds2[1] = CRGB(0, 0, 0);
+    leds2[2] = CRGB(0, 0, 0);
+    leds2[3] = CRGB(0, 0, 0);
+    ii++;
+    if (ii >= 4) ii = 0;
+    if (fs_changed) {
+      leds2[ii] = CRGB(90, 0, 0);
+    } else {
+      leds2[ii] = CRGB(0, 0, 90);
+    }
+    FastLED.show();
+    delay(50);
+
+    Serial.println(lightLevel);
   }
-  FastLED.show();
-  delay(100);
 
-  Serial.println(lightLevel);
-
+  //wait other process
+  delay(50);
   /*
   if (fs_changed) {
     root.open("/");
