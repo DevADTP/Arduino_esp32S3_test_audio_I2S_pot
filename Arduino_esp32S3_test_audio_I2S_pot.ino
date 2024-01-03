@@ -102,6 +102,9 @@ ________  ______________________.___ _______  ___________
 //TIME refresh led usb mode
 #define UPDATE_LED 100  //100ms
 
+//TIMEOUT AUTOOFF
+#define TIME_AUTO_OFF 3600000  //10min=600000  //1H=3600000s
+
 //potentiometre emotions
 #define PIN_INT_SW9 5
 #define PIN_RESET_SW9 3         //RESET: LOW  ACTIVE DEVICE:HIGH
@@ -228,6 +231,7 @@ int longPressPlayNext = 2000;                // press PLAY NEXT during 2 seconde
 unsigned long debounceDelay = 50;            // the debounce time; increase if the output flickers
 unsigned long longPressButton = 1500;        // long time pressure button
 unsigned long timeoutRefreshLed = 0;         //timeout update led refresh
+unsigned long timeoutAutoOff = 0;            //timeout auto off if not touch TIME_AUTO_OFF
 
 //button play/pause next
 int readButPlay = 0;
@@ -852,6 +856,8 @@ void setup_veilleuse() {
   //   fs_changed = false;  // to print contents initially
 
   lastDebounceTimePlayNext = millis() + longPressPlayNext;
+
+  timeoutAutoOff = millis() + TIME_AUTO_OFF;
 }
 
 
@@ -869,6 +875,19 @@ void setup_veilleuse() {
 void loop_veilleuse() {
   nowTimeMillis = millis();
   ulong_time_now = millis();
+
+  //auto off if no action during long time
+  if (millis() > timeoutAutoOff) {
+    //power auto off
+    Serial.println("POWER AUTO OFF");
+    //led off
+    fadeOutLed();
+
+    Serial.println("OFF");
+    pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
+    digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+    delay(20);
+  }
 
   //change gain depending jack inserted
   //changeGainJack();
@@ -892,6 +911,9 @@ void loop_veilleuse() {
     intthemeChoice = themeSelect(analogSwitchTheme);
 
     if (intOldthemeChoice != intthemeChoice) {
+      //update auto-off if action on any button
+      timeoutAutoOff = millis() + TIME_AUTO_OFF;
+
       intOldthemeChoice = intthemeChoice;
       //change_song();
       changeDirEmotion(intNumeroDossier);
@@ -923,6 +945,9 @@ void loop_veilleuse() {
   //read switch 9 pos emotion
   intNumeroDossier = readSwitchEmo(0);  //1 direct read  0:wait interrupt for reading
   if (intNumeroDossier != intOldNumeroDossier) {
+    //update auto-off if action on any button
+    timeoutAutoOff = millis() + TIME_AUTO_OFF;
+
     intOldNumeroDossier = intNumeroDossier;
     changeDirEmotion(intNumeroDossier);
   }
@@ -933,6 +958,10 @@ void loop_veilleuse() {
   if (buttonlightLevel != oldButtonlightLevel) {
 
     if (oldButtonlightLevel == 0 && buttonlightLevel == 1) {
+
+      //update auto-off if action on any button
+      timeoutAutoOff = millis() + TIME_AUTO_OFF;
+
       //flipLight = flipLight ^ 1;
       flipLight++;
       if (flipLight >= 4) flipLight = 0;
@@ -1059,11 +1088,17 @@ void loop_veilleuse() {
   }
 
   if (readButPlay != lastButtonPlay) {
+    //update auto-off if action on any button
+    timeoutAutoOff = millis() + TIME_AUTO_OFF;
+
     // reset the debouncing timer
     lastDebounceTimePlay = millis();
   }
 
   if (readButNext != lastButtonNext) {
+    //update auto-off if action on any button
+    timeoutAutoOff = millis() + TIME_AUTO_OFF;
+
     // reset the debouncing timer
     lastDebounceTimeNext = millis();
   }
@@ -1167,6 +1202,9 @@ void loop_veilleuse() {
     if ((valVolumeold - valVolume) > 1) updatevolume = 1;
 
     if (updatevolume == 1) {
+      //update auto-off if action on any button
+      timeoutAutoOff = millis() + TIME_AUTO_OFF;
+
       // Serial.print(valVolume);
       // Serial.print(",");
       // Serial.println(updatevolume);
