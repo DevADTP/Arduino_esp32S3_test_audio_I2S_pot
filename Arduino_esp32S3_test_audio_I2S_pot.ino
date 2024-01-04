@@ -216,6 +216,7 @@ long int valVolume = 0;
 long int valVolumeold = 0;
 int updatevolume = 0;
 int jackInserted = 0;              //status jack audio
+int intJackInserted = 0;           //interrupt active
 volatile int jackInsertedCnt = 0;  //counter jack status
 int changeGain = 0;
 
@@ -227,6 +228,7 @@ unsigned long updateTimeHorloge = 0;
 unsigned long updateAdcRead = 0;
 unsigned long updateLogUart = 0;
 unsigned long CheckTimeJackInserted = 0;
+unsigned long oldCheckTimeJackInserted = 0;
 unsigned long timeoutPressButtonLight = 0;
 unsigned long lastDebounceTimePlay = 0;      // the last time the output pin was toggled
 unsigned long lastDebounceTimeNext = 0;      // the last time the output pin was toggled
@@ -392,7 +394,8 @@ void print_wakeup_reason();
 */
 //INTERRUPT jack audio inserted
 void jackChangeInterrupt() {
-  jackInsertedCnt++;
+  //jackInsertedCnt++;
+  intJackInserted = 1;
   jackInserted = 0;
   CheckTimeJackInserted = millis() + PERIOD_JACK_DETECT;
   detachInterrupt(digitalPinToInterrupt(PIN_ADC_JACK_DETECT));
@@ -591,6 +594,9 @@ void setup_veilleuse() {
   //INIT batterie read voltage pin
   pinMode(PIN_BAT_MEAS_EN, OUTPUT);
   digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
+
+  //BATTERY STATUS
+  pinMode(PIN_CHARGE_STATUS, INPUT_PULLUP);
 
   //sd card
   if (AUDIO_ACTIVE == 1) {
@@ -873,7 +879,7 @@ void setup_veilleuse() {
   lastDebounceTimePlayNext = millis() + longPressPlayNext;
 
   timeoutAutoOff = millis() + TIME_AUTO_OFF;
-}
+}  //setup_veilleuse
 
 
 
@@ -910,7 +916,7 @@ void loop_veilleuse() {
   //check jack status digital pin not analog
   if (millis() > CheckTimeJackInserted) {
     jackInserted = 1;
-    jackInsertedCnt = 0;
+    //jackInsertedCnt = 0;
     attachInterrupt(digitalPinToInterrupt(PIN_ADC_JACK_DETECT), jackChangeInterrupt, CHANGE);
   }
 
@@ -1582,6 +1588,7 @@ void logUart(void) {
     Serial.printf("%d,", intNbAudioFileInDir);  //nb file
 
     Serial.printf("%d,", valVolume);
+
     Serial.printf("%d,%d,", jackInsertedCnt, jackInserted);
 
     Serial.printf("%d,", analogBatVoltage);
@@ -1592,10 +1599,6 @@ void logUart(void) {
     Serial.printf("%d,", bootMode2);
 
     Serial.printf("%d,", modeRandNorm);
-
-    Serial.printf("%d,", (millis() - lastDebounceTimeNext));
-
-    Serial.printf("%d,", (millis() - lastLongPressTimeNext));
 
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
