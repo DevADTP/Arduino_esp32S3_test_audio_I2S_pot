@@ -99,6 +99,10 @@ ________  ______________________.___ _______  ___________
 //TIME long press button light
 #define LONG_PRESS 4000  //4 secondes
 
+//TIME medium press button next random
+#define MEDIUM_PRESS 2000  //2 secondes
+
+
 //TIME refresh led usb mode
 #define UPDATE_LED 100  //100ms
 
@@ -227,6 +231,7 @@ unsigned long timeoutPressButtonLight = 0;
 unsigned long lastDebounceTimePlay = 0;      // the last time the output pin was toggled
 unsigned long lastDebounceTimeNext = 0;      // the last time the output pin was toggled
 unsigned long lastDebounceTimePlayNext = 0;  // the last time the output pin was toggled
+unsigned long lastLongPressTimeNext = 0;     // the last time the output pin was toggled
 int longPressPlayNext = 2000;                // press PLAY NEXT during 2 secondes
 unsigned long debounceDelay = 50;            // the debounce time; increase if the output flickers
 unsigned long longPressButton = 1500;        // long time pressure button
@@ -236,13 +241,17 @@ unsigned long timeoutAutoOff = 0;            //timeout auto off if not touch TIM
 //button play/pause next
 int readButPlay = 0;
 int readButNext = 0;
-int buttonStatePlay;        // the current reading from the input pin
-int buttonStateNext;        // the current reading from the input pin
-int buttonStateLongPress;   // the current reading from the input pin
-int lastButtonPlay = HIGH;  // the previous reading from the input pin
-int lastButtonNext = HIGH;  // the previous reading from the input pin
+int buttonStatePlay;              // the current reading from the input pin
+int buttonStateNext;              // the current reading from the input pin
+int buttonStateNextLongPress;     // the current reading from the input pin
+int buttonStateLongPress;         // the current reading from the input pin
+int lastButtonPlay = HIGH;        // the previous reading from the input pin
+int lastButtonNext = HIGH;        // the previous reading from the input pin
+int lastButtonNextRandom = HIGH;  // the previous reading from the input pin
+
 
 int nextSong = 0;
+int modeRandNorm = 1;  //0:normal  1:random
 
 //switch emotion 9 positions
 //switch theme 5 positions
@@ -336,6 +345,9 @@ void powerOffLed(void);
 void powerOnLed(void);
 void fadeOutLed(void);
 void fadeInLed(void);
+void ledlight(void);
+void animateledRot(void);
+void animateledFlip(void);
 void activeLed(int red, int green, int blue, int brighness, int active);
 int readLightButton(void);
 int readSwitchEmo(int bypassInt);
@@ -455,6 +467,9 @@ void setup() {
   //watchdog
   esp_task_wdt_init(WDT_TIMEOUT, true);  //enable panic so ESP32 restarts
   esp_task_wdt_add(NULL);                //add current thread to WDT watch
+
+  randomSeed(analogRead(0));
+  // random(300);
 
   if ((bootMode2 % 2) == 0) {
     setup_veilleuse();
@@ -964,25 +979,7 @@ void loop_veilleuse() {
 
       //flipLight = flipLight ^ 1;
       flipLight++;
-      if (flipLight >= 4) flipLight = 0;
-      switch (flipLight) {
-        case 1:
-          // light warm low
-          activeLed(255, 255, 70, 50, 1);  // red,  green,  blue,  brighness, active
-          break;
-        case 2:
-          // light warm medium
-          activeLed(255, 255, 70, 150, 1);  // red,  green,  blue,  brighness, active
-          break;
-        case 3:
-          // light warm high
-          activeLed(255, 214, 170, 200, 1);  // red,  green,  blue,  brighness, active
-          break;
-        default:
-          // light off
-          activeLed(0, 0, 0, 200, 0);  // red,  green,  blue,  active
-          break;
-      }
+      ledlight();
       // if (flipLight == 1)
       //   activeLed(0, 150, 0, 200, 1);  // red,  green,  blue,  brighness, active
       // else
@@ -1021,7 +1018,7 @@ void loop_veilleuse() {
   readButPlay = digitalRead(PIN_BUTTON_PLAY);
   readButNext = digitalRead(PIN_BUTTON_NEXT);
 
-  //test press PLAY NEXT same time  BOOT MODE
+  //test press PLAY NEXT same time => BOOT MODE
   if (readButPlay == 0 && readButNext == 0) {
     if ((millis()) > lastDebounceTimePlayNext) {
       //reboot and change boot type
@@ -1103,6 +1100,41 @@ void loop_veilleuse() {
     lastDebounceTimeNext = millis();
   }
 
+  if (readButNext != lastButtonNextRandom) {
+    //update auto-off if action on any button
+    timeoutAutoOff = millis() + TIME_AUTO_OFF;
+
+    // reset the debouncing timer and detect long press RANDOM
+    lastLongPressTimeNext = millis();
+  }
+
+  //mode random/normal
+  if ((millis() - lastLongPressTimeNext) > MEDIUM_PRESS) {
+    //test pause/play
+
+    // if the button state has changed:
+    if (readButNext != buttonStateNextLongPress) {
+      buttonStateNextLongPress = readButNext;
+
+      // only toggle the LED if the new button state is HIGH
+      if (buttonStateNextLongPress == HIGH) {
+
+        //flip normal/random
+        modeRandNorm = modeRandNorm ^ 1;
+        if (modeRandNorm == 0) {
+          Serial.println("Normal mode read song");
+          //Animate rotation
+          animateledRot();
+        } else {
+          Serial.println("Random mode read song");
+          modeRandNorm = 1;
+          //Animate flip random
+          animateledFlip();
+        }
+      }
+    } else {
+    }
+  }
 
   if ((millis() - lastDebounceTimeNext) > debounceDelay) {
     //test pause/play
@@ -1183,6 +1215,7 @@ void loop_veilleuse() {
 
   lastButtonPlay = readButPlay;
   lastButtonNext = readButNext;
+  lastButtonNextRandom = readButNext;
   //END PART button play change power audio
 
 
@@ -1477,6 +1510,11 @@ void audio_eof_mp3(const char *info) {  //end of file
 void change_song(void) {
   char local_name_directory[100] = "/09";
 
+  //gestion of normal or random
+  if (modeRandNorm == 1) {
+    nextSong = random((intNbAudioFileInDir - 1));
+  }
+
   if (nextSong >= (intNbAudioFileInDir - 1)) nextSong = 0;  //intNbAudioFileInDir
 
   //theme test
@@ -1526,7 +1564,7 @@ int themeSelect(int adcValue) {
 
 
 void logUart(void) {
-  //ADC theme | theme1-5 | ADC user | led_status | emotion | nb_files |volume0-21 | jack cnt | jack insert | bat voltage | charge status | bootMode | PSRAM
+  //ADC theme|theme1-5|ADC user|led_status|emotion|nb_files|volume0-21|jack cnt|jack insert|bat voltage|charge status|bootMode|modeRandNorm|PSRAM
   if (millis() > updateLogUart) {
     updateLogUart = millis() + PERIOD_LOG_UART;
 
@@ -1552,6 +1590,12 @@ void logUart(void) {
     //Serial.printf("%d,", bootMode);
 
     Serial.printf("%d,", bootMode2);
+
+    Serial.printf("%d,", modeRandNorm);
+
+    Serial.printf("%d,", (millis() - lastDebounceTimeNext));
+
+    Serial.printf("%d,", (millis() - lastLongPressTimeNext));
 
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
@@ -1685,6 +1729,99 @@ void fadeOutLed(void) {
     esp_task_wdt_reset();
   }
   powerOffLed();
+}
+
+
+
+void ledlight(void) {
+  if (flipLight >= 4) flipLight = 0;
+  switch (flipLight) {
+    case 1:
+      // light warm low
+      activeLed(255, 255, 70, 50, 1);  // red,  green,  blue,  brighness, active
+      break;
+    case 2:
+      // light warm medium
+      activeLed(255, 255, 70, 150, 1);  // red,  green,  blue,  brighness, active
+      break;
+    case 3:
+      // light warm high
+      activeLed(255, 214, 170, 200, 1);  // red,  green,  blue,  brighness, active
+      break;
+    default:
+      // light off
+      activeLed(0, 0, 0, 200, 0);  // red,  green,  blue,  active
+      break;
+  }
+}
+
+
+
+void animateledRot(void) {
+  unsigned long localTimeMillis = 0;
+  int ki = 0;
+
+  powerOnLed();
+  while (true) {
+    if (millis() > localTimeMillis) {
+      localTimeMillis = millis() + 100;  //100ms
+      ki++;
+      if (ki >= 12) break;
+
+      leds2[0] = CRGB(0, 0, 0);
+      leds2[1] = CRGB(0, 0, 0);
+      leds2[2] = CRGB(0, 0, 0);
+      leds2[3] = CRGB(0, 0, 0);
+      ii++;
+      if (ii >= 4) ii = 0;
+      leds2[ii] = CRGB(0, 190, 0);
+      FastLED.show();
+      delay(10);
+    }
+    if (AUDIO_ACTIVE == 1) {
+      audio.loop();
+    }
+  }
+  powerOffLed();
+  ledlight();
+}
+
+
+
+void animateledFlip(void) {
+  ii = 0;
+  unsigned long localTimeMillis = 0;
+  int ki = 0;
+
+  powerOnLed();
+  while (true) {
+    if (millis() > localTimeMillis) {
+      localTimeMillis = millis() + 100;  //100ms
+      ki++;
+      if (ki >= 12) break;
+      if (ii == 0) {
+        ii = 1;
+        leds2[0] = CRGB(0, 190, 0);
+        leds2[1] = CRGB(0, 0, 0);
+        leds2[2] = CRGB(0, 190, 0);
+        leds2[3] = CRGB(0, 0, 0);
+      } else {
+        ii = 0;
+        leds2[0] = CRGB(0, 0, 0);
+        leds2[1] = CRGB(0, 190, 0);
+        leds2[2] = CRGB(0, 0, 0);
+        leds2[3] = CRGB(0, 190, 0);
+      }
+      FastLED.show();
+      delay(10);
+    }
+
+    if (AUDIO_ACTIVE == 1) {
+      audio.loop();
+    }
+  }
+  powerOffLed();
+  ledlight();
 }
 
 
