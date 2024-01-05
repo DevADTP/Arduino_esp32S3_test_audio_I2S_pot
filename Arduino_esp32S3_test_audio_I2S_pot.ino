@@ -596,7 +596,7 @@ void setup_veilleuse() {
   digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
 
   //BATTERY STATUS
-  pinMode(PIN_CHARGE_STATUS, INPUT_PULLUP);
+  pinMode(PIN_CHARGE_STATUS, INPUT);
 
   //sd card
   if (AUDIO_ACTIVE == 1) {
