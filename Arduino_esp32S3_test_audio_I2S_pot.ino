@@ -280,6 +280,8 @@ int indiceBatVoltage = 0;
 
 //battery
 int chargeStatus = 0;
+int oldChargeStatus = 0;
+int firstChargeSatatus = 1;
 
 // Led neopixel
 CRGB leds2[NUM_LEDS2];
@@ -350,6 +352,8 @@ void fadeInLed(void);
 void ledlight(void);
 void animateledRot(void);
 void animateledFlip(void);
+void animateLedChargeComplete(void);
+void animateLedInCharge(void);
 void activeLed(int red, int green, int blue, int brighness, int active);
 int readLightButton(void);
 int readSwitchEmo(int bypassInt);
@@ -440,6 +444,8 @@ void setup() {
   // Get the counter value, if the key does not exist, return a default value of 0
   // Note: Key name is limited to 15 chars.
   bootMode2 = preferences.getUInt("bootmode", 0);
+  modeRandNorm = preferences.getUInt("audioread", 1);  //random if not define
+
   // Increase counter by 1
   //bootMode2++;
 
@@ -876,6 +882,11 @@ void setup_veilleuse() {
 
   //   fs_changed = false;  // to print contents initially
 
+  //init button play next
+  readButPlay = digitalRead(PIN_BUTTON_PLAY);
+  readButNext = digitalRead(PIN_BUTTON_NEXT);
+  buttonStateNextLongPress = readButNext;
+
   lastDebounceTimePlayNext = millis() + longPressPlayNext;
 
   timeoutAutoOff = millis() + TIME_AUTO_OFF;
@@ -951,6 +962,19 @@ void loop_veilleuse() {
 
     //Charge status
     chargeStatus = digitalRead(PIN_CHARGE_STATUS);
+
+    if ((oldChargeStatus != chargeStatus) || (firstChargeSatatus == 1)) {
+      oldChargeStatus = chargeStatus;
+      firstChargeSatatus = 0;
+
+      if (chargeStatus == 0) {
+        //blink red in charge
+        animateLedInCharge();
+      } else {
+        //blink green charge finish
+        animateLedChargeComplete();
+      }
+    }
   }
 
   //log data
@@ -982,15 +1006,9 @@ void loop_veilleuse() {
 
       //update auto-off if action on any button
       timeoutAutoOff = millis() + TIME_AUTO_OFF;
-
-      //flipLight = flipLight ^ 1;
       flipLight++;
       ledlight();
-      // if (flipLight == 1)
-      //   activeLed(0, 150, 0, 200, 1);  // red,  green,  blue,  brighness, active
-      // else
-      //   activeLed(0, 0, 0, 200, 0);    // red,  green,  blue,  brighness, active
-      //Serial.println(flipLight);
+
     } else {
       //Serial.println(buttonlightLevel);
     }
@@ -1129,11 +1147,23 @@ void loop_veilleuse() {
         modeRandNorm = modeRandNorm ^ 1;
         if (modeRandNorm == 0) {
           Serial.println("Normal mode read song");
+                    //preference on flash data etain after reboot
+          preferences.begin("my-app", false);
+          // Store the counter to the Preferences
+          preferences.putUInt("audioread", modeRandNorm);
+          // Close the Preferences
+          preferences.end();
           //Animate rotation
           animateledRot();
         } else {
           Serial.println("Random mode read song");
           modeRandNorm = 1;
+                    //preference on flash data etain after reboot
+          preferences.begin("my-app", false);
+          // Store the counter to the Preferences
+          preferences.putUInt("audioread", modeRandNorm);
+          // Close the Preferences
+          preferences.end();
           //Animate flip random
           animateledFlip();
         }
@@ -1766,6 +1796,7 @@ void animateledRot(void) {
 
   powerOnLed();
   while (true) {
+    esp_task_wdt_reset();
     if (millis() > localTimeMillis) {
       localTimeMillis = millis() + 100;  //100ms
       ki++;
@@ -1798,6 +1829,7 @@ void animateledFlip(void) {
 
   powerOnLed();
   while (true) {
+    esp_task_wdt_reset();
     if (millis() > localTimeMillis) {
       localTimeMillis = millis() + 100;  //100ms
       ki++;
@@ -1829,6 +1861,84 @@ void animateledFlip(void) {
 
 
 
+void animateLedInCharge(void) {
+  ii = 0;
+  unsigned long localTimeMillis = 0;
+  int ki = 0;
+
+  powerOnLed();
+  while (true) {
+    esp_task_wdt_reset();
+    if (millis() > localTimeMillis) {
+      localTimeMillis = millis() + 100;  //100ms
+      ki++;
+      if (ki >= 12) break;
+      if (ii == 0) {
+        ii = 1;
+        leds2[0] = CRGB(190, 0, 0);
+        leds2[1] = CRGB(190, 0, 0);
+        leds2[2] = CRGB(190, 0, 0);
+        leds2[3] = CRGB(190, 0, 0);
+      } else {
+        ii = 0;
+        leds2[0] = CRGB(0, 0, 0);
+        leds2[1] = CRGB(0, 0, 0);
+        leds2[2] = CRGB(0, 0, 0);
+        leds2[3] = CRGB(0, 0, 0);
+      }
+      FastLED.show();
+      delay(10);
+    }
+
+    if (AUDIO_ACTIVE == 1) {
+      audio.loop();
+    }
+  }
+  powerOffLed();
+  ledlight();
+}
+
+
+
+void animateLedChargeComplete(void) {
+  ii = 0;
+  unsigned long localTimeMillis = 0;
+  int ki = 0;
+
+  powerOnLed();
+  while (true) {
+    esp_task_wdt_reset();
+    if (millis() > localTimeMillis) {
+      localTimeMillis = millis() + 100;  //100ms
+      ki++;
+      if (ki >= 12) break;
+      if (ii == 0) {
+        ii = 1;
+        leds2[0] = CRGB(0, 190, 0);
+        leds2[1] = CRGB(0, 190, 0);
+        leds2[2] = CRGB(0, 190, 0);
+        leds2[3] = CRGB(0, 190, 0);
+      } else {
+        ii = 0;
+        leds2[0] = CRGB(0, 0, 0);
+        leds2[1] = CRGB(0, 0, 0);
+        leds2[2] = CRGB(0, 0, 0);
+        leds2[3] = CRGB(0, 0, 0);
+      }
+      FastLED.show();
+      delay(10);
+    }
+
+    if (AUDIO_ACTIVE == 1) {
+      audio.loop();
+    }
+  }
+  powerOffLed();
+  ledlight();
+}
+
+
+
 void activeLed(int red, int green, int blue, int brighness, int active) {
   for (i = 0; i < NUM_LEDS2; i++) {
     if (active == 1) {
@@ -1842,6 +1952,7 @@ void activeLed(int red, int green, int blue, int brighness, int active) {
   FastLED.setBrightness(brighness);
   FastLED.show();
 }
+
 
 
 void powerOnLed(void) {
@@ -2247,6 +2358,7 @@ void loop_usb() {
   //PART button play change power audio
   readButPlay = digitalRead(PIN_BUTTON_PLAY);
   readButNext = digitalRead(PIN_BUTTON_NEXT);
+
 
   //test press PLAY NEXT same time  BOOT MODE
   if (readButPlay == 0 && readButNext == 0) {
