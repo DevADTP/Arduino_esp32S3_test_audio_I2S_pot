@@ -40,10 +40,9 @@
 #include "Adafruit_TinyUSB.h"
 
 #include <esp_task_wdt.h>
-
 #include <ArduinoJson.h>
-
 #include <Preferences.h>
+
 
 
 /*
@@ -102,7 +101,6 @@ ________  ______________________.___ _______  ___________
 //TIME medium press button next random
 #define MEDIUM_PRESS 2000  //2 secondes
 
-
 //TIME refresh led usb mode
 #define UPDATE_LED 100  //100ms
 
@@ -155,6 +153,7 @@ Audio audio;
 #define WDT_TIMEOUT 10  //2 seconds WDT
 
 
+
 /*
 __________                                     __                       
 \______   \_____ ____________    _____   _____/  |_  ___________  ______
@@ -178,6 +177,7 @@ String password = "**********************";
 #define DEBUG_UART 1        //default 0
 
 
+
 /*
 ____   _________ __________.___   _____ __________.____     ___________ _________
 \   \ /   /  _  \\______   \   | /  _  \\______   \    |    \_   _____//   _____/
@@ -188,7 +188,6 @@ ____   _________ __________.___   _____ __________.____     ___________ ________
 //VARIABLES
 --------------------------------------------------------------------------------------------
 */
-
 // File system on SD Card
 SdFat sd;
 SdFile root;
@@ -251,7 +250,6 @@ int lastButtonPlay = HIGH;        // the previous reading from the input pin
 int lastButtonNext = HIGH;        // the previous reading from the input pin
 int lastButtonNextRandom = HIGH;  // the previous reading from the input pin
 
-
 int nextSong = 0;
 int modeRandNorm = 1;  //0:normal  1:random
 
@@ -267,7 +265,6 @@ int intVarAdc = 50;                                                     //ecart 
 int buttonlightLevel = 0;
 int oldButtonlightLevel = 0;
 int lightLevel = 0;
-
 
 //adc
 int analogSwitchTheme = 0;
@@ -301,9 +298,7 @@ int intOldthemeChoice = 1;
 int intOldNumeroDossier = 0;
 int intNombreDossier = 9;
 
-
 char name_directory[100] = "/09";
-
 
 //time NTP RTC
 const char *ntpServer = "pool.ntp.org";
@@ -314,7 +309,6 @@ RTC_PCF8563 rtc;
 DateTime now;
 struct tm timeinfo;
 char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
-
 
 //wifi
 int intWifiConnectRetry = 0;
@@ -328,6 +322,8 @@ String jsonString;
 
 //preference for boot
 Preferences preferences;
+
+
 
 /*
 ___________                   __  .__                      
@@ -386,6 +382,7 @@ void loop_veilleuse();
 void print_wakeup_reason();
 
 
+
 /*
 .___        __                                    __          
 |   | _____/  |_  __________________ __ _________/  |_  ______
@@ -404,6 +401,7 @@ void jackChangeInterrupt() {
   CheckTimeJackInserted = millis() + PERIOD_JACK_DETECT;
   detachInterrupt(digitalPinToInterrupt(PIN_ADC_JACK_DETECT));
 }
+
 
 
 //INTERRUPT expander io switch 9 positions
@@ -1370,6 +1368,8 @@ void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
   Serial.println(intNbAudioFileInDir);
 }
 
+
+
 void createDir(fs::FS &fs, const char *path) {
   Serial.printf("Creating Dir: %s\n", path);
   if (fs.mkdir(path)) {
@@ -1379,6 +1379,8 @@ void createDir(fs::FS &fs, const char *path) {
   }
 }
 
+
+
 void removeDir(fs::FS &fs, const char *path) {
   Serial.printf("Removing Dir: %s\n", path);
   if (fs.rmdir(path)) {
@@ -1387,6 +1389,8 @@ void removeDir(fs::FS &fs, const char *path) {
     Serial.println("rmdir failed");
   }
 }
+
+
 
 void readFile(fs::FS &fs, const char *path) {
   Serial.printf("Reading file: %s\n", path);
@@ -1404,6 +1408,8 @@ void readFile(fs::FS &fs, const char *path) {
   file.close();
 }
 
+
+
 void writeFile(fs::FS &fs, const char *path, const char *message) {
   Serial.printf("Writing file: %s\n", path);
 
@@ -1419,6 +1425,8 @@ void writeFile(fs::FS &fs, const char *path, const char *message) {
   }
   file.close();
 }
+
+
 
 void appendFile(fs::FS &fs, const char *path, const char *message) {
   Serial.printf("Appending to file: %s\n", path);
@@ -1436,6 +1444,8 @@ void appendFile(fs::FS &fs, const char *path, const char *message) {
   file.close();
 }
 
+
+
 void renameFile(fs::FS &fs, const char *path1, const char *path2) {
   Serial.printf("Renaming file %s to %s\n", path1, path2);
   if (fs.rename(path1, path2)) {
@@ -1445,6 +1455,8 @@ void renameFile(fs::FS &fs, const char *path1, const char *path2) {
   }
 }
 
+
+
 void deleteFile(fs::FS &fs, const char *path) {
   Serial.printf("Deleting file: %s\n", path);
   if (fs.remove(path)) {
@@ -1453,6 +1465,8 @@ void deleteFile(fs::FS &fs, const char *path) {
     Serial.println("Delete failed");
   }
 }
+
+
 
 void testFileIO(fs::FS &fs, const char *path) {
   File file = fs.open(path);
@@ -1771,15 +1785,15 @@ void ledlight(void) {
   switch (flipLight) {
     case 1:
       // light warm low
-      activeLed(255, 255, 70, 50, 1);  // red,  green,  blue,  brighness, active
+      activeLed(255, 255, 0, 50, 1);  // red,  green,  blue,  brighness, active
       break;
     case 2:
       // light warm medium
-      activeLed(255, 255, 70, 150, 1);  // red,  green,  blue,  brighness, active
+      activeLed(255, 255, 0, 150, 1);  // red,  green,  blue,  brighness, active
       break;
     case 3:
       // light warm high
-      activeLed(255, 214, 170, 200, 1);  // red,  green,  blue,  brighness, active
+      activeLed(255, 255, 0, 200, 1);  // red,  green,  blue,  brighness, active
       break;
     default:
       // light off
@@ -2176,7 +2190,6 @@ void changeGainJack(void) {
 //USB key function
 --------------------------------------------------------------------------------------------
 */
-
 // the setup function runs once when you press reset or power the board
 void setup_usb() {
 
@@ -2274,6 +2287,8 @@ void setup_usb() {
   //reset watchdog
   esp_task_wdt_reset();
 }
+
+
 
 void loop_usb() {
   nowTimeMillis = millis();
@@ -2460,6 +2475,8 @@ void loop_usb() {
   */
 }
 
+
+
 // Callback invoked when received READ10 command.
 // Copy disk's data to buffer (up to bufsize) and
 // return number of copied bytes (must be multiple of block size)
@@ -2474,6 +2491,8 @@ int32_t msc_read_cb(uint32_t lba, void *buffer, uint32_t bufsize) {
 
   return rc ? bufsize : -1;
 }
+
+
 
 // Callback invoked when received WRITE10 command.
 // Process data in buffer to disk's storage and
@@ -2491,6 +2510,8 @@ int32_t msc_write_cb(uint32_t lba, uint8_t *buffer, uint32_t bufsize) {
 
   return rc ? bufsize : -1;
 }
+
+
 
 // Callback invoked when WRITE10 command is completed (status received and accepted by host).
 // used to flush any pending cache.
