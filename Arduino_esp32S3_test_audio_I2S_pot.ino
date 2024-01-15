@@ -43,7 +43,8 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
-
+#include <ESPAsyncWebServer.h>
+#include <AsyncWebSocket.h>
 
 /*
 ________  ______________________.___ _______  ___________
@@ -165,8 +166,8 @@ __________                                     __
 --------------------------------------------------------------------------------------------
 */
 //WIFI
-String ssid = "*****************";
-String password = "**********************";
+String ssid = "ADTPBUREAUETUDE02";
+String password = "ADTP-BE-2023";
 
 #define WIFI_ACTIVE 0       //default 1  update RTC on NTP server
 #define TEST_GAIN_VOLUME 0  //default 0
@@ -175,6 +176,7 @@ String password = "**********************";
 #define AUDIO_ACTIVE 1      //default 1 (0:PSRAM access)
 #define RTC_ACTIVE 0        //default 1
 #define DEBUG_UART 1        //default 0
+#define WEBSOCKET 0         //default 0
 
 
 
@@ -258,7 +260,12 @@ int modeRandNorm = 1;  //0:normal  1:random
 int intDetectExpIoSw9 = 0;
 int intCmptRotSw9 = 0;
 int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
-int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2947, 3530 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//seuil ADC theme generique
+//int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2947, 3530 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//carte 09 S48-2023
+int intMatTheme[8] = { 0, 3150, 2013, 8000, 9000, 10000, 3050, 3628 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 int intVarAdc = 50;                                                     //ecart adc 10 -> 50
 
 //button light
@@ -324,6 +331,29 @@ String jsonString;
 Preferences preferences;
 
 
+//websocket debug
+String jsonStringws;
+DynamicJsonDocument jsonDoc(1024);
+AsyncWebServer server(8080);
+AsyncWebSocket wbsoc("/ws");
+
+
+void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  if (type == WS_EVT_CONNECT) {
+    Serial.println("Client connecté");
+  } else if (type == WS_EVT_DISCONNECT) {
+    Serial.println("Client déconnecté");
+  } else if (type == WS_EVT_DATA) {
+    AwsFrameInfo *info = (AwsFrameInfo *)arg;
+    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+      // Message texte reçu
+      data[len] = 0;
+      Serial.printf("Données reçues: %s\n", data);
+    }
+  }
+}
+
+
 
 /*
 ___________                   __  .__                      
@@ -380,6 +410,10 @@ void setup_veilleuse();
 void loop_veilleuse();
 
 void print_wakeup_reason();
+
+//websocket
+void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+
 
 
 
@@ -544,6 +578,10 @@ void print_wakeup_reason() {
 --------------------------------------------------------------------------------------------
 */
 void setup_veilleuse() {
+
+  //reset watchdog
+  esp_task_wdt_reset();
+
   // //auto maintain power of the board when start
   // //DO activate when R22 100K remove
   // pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
@@ -644,6 +682,7 @@ void setup_veilleuse() {
       intWifiConnectRetry++;
       Serial.print(".");
       delay(100);
+      esp_task_wdt_reset();
       if (intWifiConnectRetry >= 50) break;
     }
 
@@ -652,7 +691,8 @@ void setup_veilleuse() {
     } else {
       Serial.println("wifi OK");
     }
-    delay(1500);
+    //delay(1500);
+    esp_task_wdt_reset();
 
     //  Serial.print("DATETIME avant: ");
     //  Serial.print(__DATE__);
@@ -687,9 +727,14 @@ void setup_veilleuse() {
       rtc.start();
     }
 
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-
+    if (WEBSOCKET == 1) {
+      wbsoc.onEvent(onWebSocketEvent);
+      server.addHandler(&wbsoc);
+      server.begin();
+    } else {
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+    }
   }  //wifi define
 
   ulong_time_picture = millis() + TIME_PICTURE_END;
@@ -795,9 +840,12 @@ void setup_veilleuse() {
     //delay(2000);
     Serial.println("wifi disconnect");
   }
-  //turn off wifi
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
+
+  if (WEBSOCKET == 0) {
+    //turn off wifi
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+  }
 
   if (DEBUG_UART == 1) {
     //delay(2000);
@@ -973,7 +1021,25 @@ void loop_veilleuse() {
         animateLedChargeComplete();
       }
     }
-  }
+
+    if (WEBSOCKET == 1) {
+      // Créer un objet JSON avec la bibliothèque ArduinoJson
+      //const size_t capacity = JSON_OBJECT_SIZE(5);
+      jsonDoc["bat"] = analogBatVoltage;
+      jsonDoc["thm"] = intthemeChoice;
+      jsonDoc["emo"] = intNumeroDossier;
+      jsonDoc["vol"] = valVolume;
+      jsonDoc["chg"] = chargeStatus;
+
+      // Convertir l'objet JSON en chaîne
+      serializeJson(jsonDoc, jsonStringws);
+
+      // Envoyer la trame JSON aux clients WebSocket connectés
+      Serial.println(jsonStringws);
+      esp_task_wdt_reset();
+      //wbsoc.textAll(jsonStringws);
+    }
+  }  //update adc updateAdcRead each 1sec
 
   //log data
   logUart();
@@ -1145,7 +1211,7 @@ void loop_veilleuse() {
         modeRandNorm = modeRandNorm ^ 1;
         if (modeRandNorm == 0) {
           Serial.println("Normal mode read song");
-                    //preference on flash data etain after reboot
+          //preference on flash data etain after reboot
           preferences.begin("my-app", false);
           // Store the counter to the Preferences
           preferences.putUInt("audioread", modeRandNorm);
@@ -1156,7 +1222,7 @@ void loop_veilleuse() {
         } else {
           Serial.println("Random mode read song");
           modeRandNorm = 1;
-                    //preference on flash data etain after reboot
+          //preference on flash data etain after reboot
           preferences.begin("my-app", false);
           // Store the counter to the Preferences
           preferences.putUInt("audioread", modeRandNorm);
@@ -1643,6 +1709,12 @@ void logUart(void) {
     Serial.printf("%d,", bootMode2);
 
     Serial.printf("%d,", modeRandNorm);
+
+    if (WEBSOCKET == 1) {
+      //print ip
+      Serial.print(WiFi.localIP());
+      Serial.print(",");
+    }
 
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
