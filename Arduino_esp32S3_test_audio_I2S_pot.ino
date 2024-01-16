@@ -173,6 +173,7 @@ String password = "**********************";
 
 //key AES128bit 16Bytes
 #define KEY_AES128 "abcdefghijklmnop"
+#define AES_BLOCK_SIZE 16
 
 #define WIFI_ACTIVE 0       //default 1  update RTC on NTP server
 #define TEST_GAIN_VOLUME 0  //default 0
@@ -273,9 +274,19 @@ int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
 //seuil ADC theme generique
 //int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2947, 3530 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
-//carte 09 S48-2023
-int intMatTheme[8] = { 0, 3150, 2013, 8000, 9000, 10000, 3050, 3628 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
-int intVarAdc = 50;                                                     //ecart adc 10 -> 50
+//carte 02 S48-2023 -> Dev board
+int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//carte 03 S48-2023 -> livraison
+//int intMatTheme[8] = { 0, 3143, 2007, 8000, 9000, 10000, 3041, 3611 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//carte 05 S48-2023 -> livraison
+//int intMatTheme[8] = { 0, 3143, 2008, 8000, 9000, 10000, 3035, 3605 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//carte 09 S48-2023 -> livraison
+//int intMatTheme[8] = { 0, 3150, 2013, 8000, 9000, 10000, 3050, 3628 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+int intVarAdc = 50;  //ecart adc 10 -> 50
 
 //button light
 int buttonlightLevel = 0;
@@ -433,6 +444,8 @@ void print_wakeup_reason();
 //websocket
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 
+//encryption
+void decryptFile(const char *encryptedFileName, const char *decryptedFileName);
 
 
 
@@ -692,6 +705,10 @@ void setup_veilleuse() {
 
     Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
     Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
+
+    //test decrypt file
+    //66.248s decript medium_file_not_encrypt.enc
+    //decryptFile("/medium_file_not_encrypt.enc", "/medium_file_not_encrypt.mp3");
   }
 
   //memoire PSRAM
@@ -1754,13 +1771,13 @@ void logUart(void) {
       Serial.print(",");
     }
 
-    //decrypt
-    Serial.print(",");
-    for (i = 0; i < 16; i++) {
-      sprintf(strcrypt, "%02x", (int)outputcrypt[i]);
-      Serial.print(strcrypt);
-    }
-    Serial.printf(",%d,", timeDecodeCrypt);
+    // //decrypt
+    // Serial.print(",");
+    // for (i = 0; i < 16; i++) {
+    //   sprintf(strcrypt, "%02x", (int)outputcrypt[i]);
+    //   Serial.print(strcrypt);
+    // }
+    Serial.printf("%d,", timeDecodeCrypt);
 
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
@@ -2502,7 +2519,7 @@ void loop_usb() {
 
       ++bootMode2;
       // Ajoutez des données au document JSON
-      jsonConfig["mode"] = "usb";  //normal ou usb
+      jsonConfig["mode"] = "normal";  //normal ou usb
       jsonConfig["Nb"] = bootMode2;
 
       // convert json and print
@@ -2646,4 +2663,54 @@ void msc_flush_cb(void) {
   fs_changed = true;
 
   // digitalWrite(LED_BUILTIN, LOW);
+}
+
+
+
+//Decryptage fichier
+
+void decryptFile(const char *encryptedFileName, const char *decryptedFileName) {
+  File encryptedFile = SD.open(encryptedFileName, FILE_READ);
+  File decryptedFile = SD.open(decryptedFileName, FILE_WRITE);
+
+  if (!encryptedFile) {
+    timeDecodeCrypt = -1000;
+    Serial.println("Erreur lors de l'ouverture du fichier encrypt (read)");
+    return;
+  }
+
+    if ( !decryptedFile) {
+    timeDecodeCrypt = -2000;
+    Serial.println("Erreur lors de l'ouverture des fichiers decrypt (write)");
+    return;
+  }
+
+  mbedtls_aes_init(&aes);
+  mbedtls_aes_setkey_dec(&aes, (const unsigned char *)keycrypt, strlen(keycrypt) * 8);  // Taille de clé en bits
+
+  byte bufferIn[AES_BLOCK_SIZE];
+  byte bufferOut[AES_BLOCK_SIZE];
+
+  timeDecodeCrypt = millis();
+  while (encryptedFile.available()) {
+
+    //wathdog reset
+    esp_task_wdt_reset();
+
+    // Lire un bloc du fichier chiffré
+    encryptedFile.read(bufferIn, AES_BLOCK_SIZE);
+
+    // Déchiffrer le bloc
+    mbedtls_aes_crypt_ecb(&aes, MBEDTLS_AES_DECRYPT, bufferIn, bufferOut);
+
+    // Écrire le bloc déchiffré dans le fichier déchiffré
+    decryptedFile.write(bufferOut, AES_BLOCK_SIZE);
+  }
+  timeDecodeCrypt = millis() - timeDecodeCrypt;
+
+  mbedtls_aes_free(&aes);
+  encryptedFile.close();
+  decryptedFile.close();
+
+  Serial.println("Déchiffrement terminé.");
 }
