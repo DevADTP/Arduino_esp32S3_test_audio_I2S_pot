@@ -108,7 +108,7 @@ ________  ______________________.___ _______  ___________
 #define UPDATE_LED 100  //100ms
 
 //TIMEOUT AUTOOFF
-#define TIME_AUTO_OFF 3600000  //10min=600000  //1H=3600000s
+#define TIME_AUTO_OFF 28800000  //10min=600000ms  //1H=3600000ms  //8h=28800000ms
 
 //potentiometre emotions
 #define PIN_INT_SW9 5
@@ -274,14 +274,17 @@ int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
 //seuil ADC theme generique
 //int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2947, 3530 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
+//carte 02 S45-2023 -> Dev board cirly
+//int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
 //carte 02 S48-2023 -> Dev board
-int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+//int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
 //carte 03 S48-2023 -> livraison
 //int intMatTheme[8] = { 0, 3143, 2007, 8000, 9000, 10000, 3041, 3611 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
 //carte 05 S48-2023 -> livraison
-//int intMatTheme[8] = { 0, 3143, 2008, 8000, 9000, 10000, 3035, 3605 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+int intMatTheme[8] = { 0, 3143, 2008, 8000, 9000, 10000, 3035, 3605 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
 //carte 09 S48-2023 -> livraison
 //int intMatTheme[8] = { 0, 3150, 2013, 8000, 9000, 10000, 3050, 3628 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
@@ -1676,6 +1679,11 @@ void audio_eof_mp3(const char *info) {  //end of file
   change_song();
 }
 
+//audio info I2S
+//------------------EVENTS----------------------------------------------------------------------------------------------
+void audio_info(const char *info){
+    Serial.printf("info: %s\n", info);
+}
 
 
 void change_song(void) {
@@ -1875,7 +1883,7 @@ void ledBatteryLevel(void) {
 
 void fadeInLed(void) {
   powerOnLed();
-  for (ii = 10; ii < 150; ii = ii + 10) {
+  for (ii = 10; ii < 250; ii = ii + 10) {
     for (i = 0; i < NUM_LEDS2; i++) {
       leds2[i] = CRGB(0, 0, ii);
     }
@@ -1901,7 +1909,7 @@ void fadeOutLed(void) {
   }
   FastLED.show();
   delay(1000);
-  for (ii = 140; ii >= 0; ii = ii - 10) {
+  for (ii = 250; ii >= 0; ii = ii - 10) {
 
     for (i = 0; i < NUM_LEDS2; i++) {
       leds2[i] = CRGB(0, 0, ii);
@@ -1957,7 +1965,7 @@ void animateledRot(void) {
       leds2[3] = CRGB(0, 0, 0);
       ii++;
       if (ii >= 4) ii = 0;
-      leds2[ii] = CRGB(0, 190, 0);
+      leds2[ii] = CRGB(0, 250, 0);
       FastLED.show();
       delay(10);
     }
@@ -1985,16 +1993,16 @@ void animateledFlip(void) {
       if (ki >= 12) break;
       if (ii == 0) {
         ii = 1;
-        leds2[0] = CRGB(0, 190, 0);
+        leds2[0] = CRGB(0, 250, 0);
         leds2[1] = CRGB(0, 0, 0);
-        leds2[2] = CRGB(0, 190, 0);
+        leds2[2] = CRGB(0, 250, 0);
         leds2[3] = CRGB(0, 0, 0);
       } else {
         ii = 0;
         leds2[0] = CRGB(0, 0, 0);
-        leds2[1] = CRGB(0, 190, 0);
+        leds2[1] = CRGB(0, 250, 0);
         leds2[2] = CRGB(0, 0, 0);
-        leds2[3] = CRGB(0, 190, 0);
+        leds2[3] = CRGB(0, 250, 0);
       }
       FastLED.show();
       delay(10);
@@ -2451,7 +2459,7 @@ void loop_usb() {
     leds2[1] = CRGB(0, 0, 0);
     leds2[2] = CRGB(0, 0, 0);
     leds2[3] = CRGB(0, 0, 0);
-    for (jj = 90; jj > 0; jj = jj - 10) {
+    for (jj = 250; jj > 0; jj = jj - 27) {
       {
         for (ii = 0; ii < NUM_LEDS2; ii++) {
           leds2[ii] = CRGB(jj, 0, 0);
@@ -2493,9 +2501,9 @@ void loop_usb() {
     ii++;
     if (ii >= 4) ii = 0;
     if (fs_changed) {
-      leds2[ii] = CRGB(90, 0, 0);
+      leds2[ii] = CRGB(200, 0, 0);
     } else {
-      leds2[ii] = CRGB(0, 0, 90);
+      leds2[ii] = CRGB(0, 0, 200);
     }
     FastLED.show();
     delay(50);
