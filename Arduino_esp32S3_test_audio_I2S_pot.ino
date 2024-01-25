@@ -108,7 +108,7 @@ ________  ______________________.___ _______  ___________
 #define UPDATE_LED 100  //100ms
 
 //TIMEOUT AUTOOFF
-#define TIME_AUTO_OFF 28800000  //10min=600000ms  //1H=3600000ms  //8h=28800000ms
+#define TIME_AUTO_OFF 3600000  //10min=600000ms  //1H=3600000ms  //8h=28800000ms
 
 //potentiometre emotions
 #define PIN_INT_SW9 5
@@ -274,6 +274,9 @@ int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
 //seuil ADC theme generique
 //int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2947, 3530 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
+//carte 01 S48-2023 -> livraison 25/01/2024  -> problem boot button
+int intMatTheme[8] = { 0, 3015, 1922, 8000, 9000, 10000, 2920, 3492 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
 //carte 02 S45-2023 -> Dev board cirly
 //int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
@@ -284,15 +287,35 @@ int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
 //int intMatTheme[8] = { 0, 3143, 2007, 8000, 9000, 10000, 3041, 3611 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
 //carte 05 S48-2023 -> livraison
-int intMatTheme[8] = { 0, 3143, 2008, 8000, 9000, 10000, 3035, 3605 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+//int intMatTheme[8] = { 0, 3143, 2008, 8000, 9000, 10000, 3035, 3605 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
 //carte 09 S48-2023 -> livraison
 //int intMatTheme[8] = { 0, 3150, 2013, 8000, 9000, 10000, 3050, 3628 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
+//carte 10 S48-2023 -> livraison 25/01/2024  -> problem boot button
+//int intMatTheme[8] = { 0, 3191, 2037, 8000, 9000, 10000, 3094, 3652 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//carte 11 S48-2023 -> livraison 25/01/2024
+//int intMatTheme[8] = { 0, 3083, 1966, 8000, 9000, 10000, 2983, 3547 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//carte 06 S48-2023 -> livraison 25/01/2024
+//int intMatTheme[8] = { 0, 3123, 1992, 8000, 9000, 10000, 3020, 3606 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//carte 04 S48-2023 -> livraison 25/01/2024
+//int intMatTheme[8] = { 0, 3109, 1980, 8000, 9000, 10000, 3012, 3570 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//carte 08 S48-2023 -> livraison 25/01/2024  -> problem boot button
+//int intMatTheme[8] = { 0, 3109, 1980, 8000, 9000, 10000, 3012, 3570 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
+//carte 07 S48-2023 -> livraison 25/01/2024 -> probleme CC
+//int intMatTheme[8] = { 0, xxxx, xxxx, 8000, 9000, 10000, xxxx, xxxx };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+
 int intVarAdc = 50;  //ecart adc 10 -> 50
 
-//button light
-int buttonlightLevel = 0;
+long int numeroSerie = 2023480001;
+
+  //button light
+  int buttonlightLevel = 0;
 int oldButtonlightLevel = 0;
 int lightLevel = 0;
 
@@ -362,13 +385,25 @@ AsyncWebSocket wbsoc("/ws");
 
 
 //encryption
+#ifdef _MODIF_SULSULDEV
+#else
 mbedtls_aes_context aes;
-
 char *keycrypt = KEY_AES128;
+#endif
+
+unsigned char decrypredData[16] = { 0 };
+unsigned char encrypredData[16] = { 0 };
+uint32_t nrOfDecryptedBytes = 16;
+char strcrypt[3];
+
+//encryption
+// mbedtls_aes_context aes;
+// char *keycrypt = KEY_AES128;
 
 char *inputcrypt = "Mandalou - crypt";  //16bytes packet
-unsigned char outputcrypt[16];
-char strcrypt[3];
+unsigned char outputcrypt[16] = { 0 };
+;
+//char strcrypt[3];
 
 
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
@@ -495,6 +530,9 @@ void intExpIoSw9() {
 void setup() {
   //auto maintain power of the board when start
   //DO activate when R22 100K remove
+  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
+  delay(200);
+
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
   digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
   delay(200);
@@ -1681,8 +1719,8 @@ void audio_eof_mp3(const char *info) {  //end of file
 
 //audio info I2S
 //------------------EVENTS----------------------------------------------------------------------------------------------
-void audio_info(const char *info){
-    Serial.printf("info: %s\n", info);
+void audio_info(const char *info) {
+  //Serial.printf("info: %s\n", info);
 }
 
 
@@ -1786,6 +1824,8 @@ void logUart(void) {
     //   Serial.print(strcrypt);
     // }
     Serial.printf("%d,", timeDecodeCrypt);
+
+    Serial.printf("%d,", numeroSerie);
 
     Serial.print(ESP.getFreePsram());
     Serial.printf("\n");
@@ -2687,7 +2727,7 @@ void decryptFile(const char *encryptedFileName, const char *decryptedFileName) {
     return;
   }
 
-    if ( !decryptedFile) {
+  if (!decryptedFile) {
     timeDecodeCrypt = -2000;
     Serial.println("Erreur lors de l'ouverture des fichiers decrypt (write)");
     return;
