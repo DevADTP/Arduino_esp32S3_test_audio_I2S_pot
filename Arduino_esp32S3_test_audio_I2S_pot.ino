@@ -181,7 +181,7 @@ String password = "**********************";
 #define LAMPE_NB_COLOR 1    //default 1  20:mix cobinaison couleur  top/bottom
 #define AUDIO_ACTIVE 1      //default 1 (0:PSRAM access)
 #define RTC_ACTIVE 0        //default 1
-#define DEBUG_UART 1        //default 0
+#define DEBUG_UART 0        //default 0
 #define WEBSOCKET 0         //default 0
 
 
@@ -314,10 +314,13 @@ int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 
 //int intMatTheme[8] = { 0, 3083, 1966, 8000, 9000, 10000, 2983, 3547 };  //0 1 2 . . . 6 7
 
 
-
+//ADC flucutation for thema
 int intVarAdc = 50;  //ecart adc 10 -> 50
 
-long int numeroSerie = 2023450002;
+long int numeroSerie = 2023539999;
+
+//debug uart
+int uartdbg = 1;
 
 //button light
 int buttonlightLevel = 0;
@@ -441,7 +444,7 @@ ___________                   __  .__
 --------------------------------------------------------------------------------------------
 */
 void change_song(void);
-void logUart(void);
+void logUart(int modeuart);
 void uartConfig(void);
 int themeSelect(void);
 void readBatLevel(void);
@@ -565,6 +568,7 @@ void setup() {
   intMatTheme[6] = preferences.getUInt("th6", 0);
   intMatTheme[7] = preferences.getUInt("th7", 0);
   numeroSerie = preferences.getLong("sn", 0);
+  uartdbg = preferences.getUInt("uartdbg", 1);  //uart debug by default
 
   // Increase counter by 1
   //bootMode2++;
@@ -865,7 +869,7 @@ void setup_veilleuse() {
   // pinMode(I2S_GAIN, INPUT_PULLDOWN);
 
   //enable AUDIO
-  if (DEBUG_UART == 1) {
+  if ((DEBUG_UART == 1) || (uartdbg == 1)) {
     // delay(2000);
     Serial.println("Enable AUDIO");
   }
@@ -874,24 +878,24 @@ void setup_veilleuse() {
   //pinMode(PIN_ENABLE_I2S, OUTPUT);
   //digitalWrite(PIN_ENABLE_I2S, HIGH);
 
-  if (DEBUG_UART == 1) {
+  if ((DEBUG_UART == 1) || (uartdbg == 1)) {
     // delay(2000);
     Serial.println("active read AUDIO");
   }
   if (AUDIO_ACTIVE == 1) {
     Serial.println("set pinout");
     audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-    if (DEBUG_UART == 1) {
+    if ((DEBUG_UART == 1) || (uartdbg == 1)) {
       //delay(2000);
       Serial.println("set balance");
     }
     audio.setBalance(-16);  // mutes the left channel
-    if (DEBUG_UART == 1) {
+    if ((DEBUG_UART == 1) || (uartdbg == 1)) {
       //delay(2000);
       Serial.println("set volume 0");
     }
     audio.setVolume(0);
-    if (DEBUG_UART == 1) {
+    if ((DEBUG_UART == 1) || (uartdbg == 1)) {
       //delay(2000);
       Serial.println("set mono true");
     }
@@ -902,20 +906,20 @@ void setup_veilleuse() {
 
     //sd musique
     //audio.connecttoFS(SD, "/04/001.mp3");
-    if (DEBUG_UART == 1) {
+    if ((DEBUG_UART == 1) || (uartdbg == 1)) {
       //delay(2000);
       Serial.println("audio connect mp3");
     }
     audio.connecttoSD("/04/001.mp3");
 
-    if (DEBUG_UART == 1) {
+    if ((DEBUG_UART == 1) || (uartdbg == 1)) {
       //delay(2000);
       Serial.println("pause");
     }
     audio.pauseResume();
   }
 
-  if (DEBUG_UART == 1) {
+  if ((DEBUG_UART == 1) || (uartdbg == 1)) {
     //delay(2000);
     Serial.println("button play next");
   }
@@ -924,7 +928,7 @@ void setup_veilleuse() {
   pinMode(PIN_BUTTON_NEXT, INPUT_PULLUP);
 
 
-  if (DEBUG_UART == 1) {
+  if ((DEBUG_UART == 1) || (uartdbg == 1)) {
     //delay(2000);
     Serial.println("jack detect");
   }
@@ -932,7 +936,7 @@ void setup_veilleuse() {
   pinMode(PIN_ADC_JACK_DETECT, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_ADC_JACK_DETECT), jackChangeInterrupt, CHANGE);
 
-  if (DEBUG_UART == 1) {
+  if ((DEBUG_UART == 1) || (uartdbg == 1)) {
     //delay(2000);
     Serial.println("switch emotion");
   }
@@ -947,7 +951,7 @@ void setup_veilleuse() {
   pinMode(PIN_INT_SW9, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_INT_SW9), intExpIoSw9, FALLING);
 
-  if (DEBUG_UART == 1) {
+  if ((DEBUG_UART == 1) || (uartdbg == 1)) {
     //delay(2000);
     Serial.println("wifi disconnect");
   }
@@ -958,7 +962,7 @@ void setup_veilleuse() {
     WiFi.mode(WIFI_OFF);
   }
 
-  if (DEBUG_UART == 1) {
+  if ((DEBUG_UART == 1) || (uartdbg == 1)) {
     //delay(2000);
     Serial.println("read battery");
   }
@@ -991,7 +995,7 @@ void setup_veilleuse() {
   //   // Serial.println(analogBatVoltage);
   // }
 
-  if (DEBUG_UART == 1) {
+  if ((DEBUG_UART == 1) || (uartdbg == 1)) {
     //delay(2000);
     Serial.println("exit setup -> loop");
     // while (true)
@@ -1153,7 +1157,7 @@ void loop_veilleuse() {
   }  //update adc updateAdcRead each 1sec
 
   //log data
-  logUart();
+  logUart(1);
 
   //uart config
   uartConfig();
@@ -1234,7 +1238,8 @@ void loop_veilleuse() {
 
       // convert json and print
       serializeJson(jsonConfig, jsonString);
-      Serial.println(jsonString);
+      //Serial.println(jsonString);   //not secure see password uart
+      Serial.println("BOOT USB MODE");
 
       //save on preference flash
       //preference on flash data etain after reboot
@@ -1798,55 +1803,69 @@ int themeSelect(int adcValue) {
 
 
 
-void logUart(void) {
+void logUart(int modeuart) {
+
   //ADC theme|theme1-5|ADC user|led_status|emotion|nb_files|volume0-21|jack cnt|jack insert|bat voltage|charge status|bootMode|modeRandNorm|PSRAM
-  if (millis() > updateLogUart) {
-    updateLogUart = millis() + PERIOD_LOG_UART;
+  if ((millis() > updateLogUart) && ((DEBUG_UART == 1) || (uartdbg == 1))) {
+    if (modeuart == 1) {
+      updateLogUart = millis() + PERIOD_LOG_UART;
 
-    Serial.printf("%d,", analogSwitchTheme);
+      Serial.printf("%d,", analogSwitchTheme);
 
-    //Méditation Yoga Musique Histoire Bruit Blanc
-    Serial.printf("%d,", intthemeChoice);  //THEMES Sub directory
+      //Méditation Yoga Musique Histoire Bruit Blanc
+      Serial.printf("%d,", intthemeChoice);  //THEMES Sub directory
 
-    Serial.printf("%d,", analogSwitchuser);
+      Serial.printf("%d,", analogSwitchuser);
 
-    Serial.printf("%d,", flipLight);  //led status
+      Serial.printf("%d,", flipLight);  //led status
 
-    Serial.printf("%d,", intNumeroDossier);  //EMOTION Main directory
+      Serial.printf("%d,", intNumeroDossier);  //EMOTION Main directory
 
-    Serial.printf("%d,", intNbAudioFileInDir);  //nb file
+      Serial.printf("%d,", intNbAudioFileInDir);  //nb file
 
-    Serial.printf("%d,", valVolume);
+      Serial.printf("%d,", valVolume);
 
-    Serial.printf("%d,%d,", jackInsertedCnt, jackInserted);
+      Serial.printf("%d,%d,", jackInsertedCnt, jackInserted);
 
-    Serial.printf("%d,", analogBatVoltage);
-    Serial.printf("%d,", chargeStatus);
+      Serial.printf("%d,", analogBatVoltage);
+      Serial.printf("%d,", chargeStatus);
 
-    //Serial.printf("%d,", bootMode);
+      //Serial.printf("%d,", bootMode);
 
-    Serial.printf("%d,", bootMode2);
+      Serial.printf("%d,", bootMode2);
 
-    Serial.printf("%d,", modeRandNorm);
+      Serial.printf("%d,", modeRandNorm);
 
-    if (WEBSOCKET == 1) {
-      //print ip
-      Serial.print(WiFi.localIP());
-      Serial.print(",");
+      if (WEBSOCKET == 1) {
+        //print ip
+        Serial.print(WiFi.localIP());
+        Serial.print(",");
+      }
+
+      // //decrypt
+      // Serial.print(",");
+      // for (i = 0; i < 16; i++) {
+      //   sprintf(strcrypt, "%02x", (int)outputcrypt[i]);
+      //   Serial.print(strcrypt);
+      // }
+      Serial.printf("%d,", timeDecodeCrypt);
+
+      Serial.printf("%d,", numeroSerie);
+
+      Serial.print(ESP.getFreePsram());
+      Serial.printf("\n");
+    }  //if modeuart=1 NORMAL
+    else {
+      //modeuart!=1 USB
+      Serial.printf("%d,", bootMode2);
+
+      Serial.printf("%d,", lightLevel);
+
+      Serial.printf("%d,", numeroSerie);
+
+      Serial.print(ESP.getFreePsram());
+      Serial.printf("\n");
     }
-
-    // //decrypt
-    // Serial.print(",");
-    // for (i = 0; i < 16; i++) {
-    //   sprintf(strcrypt, "%02x", (int)outputcrypt[i]);
-    //   Serial.print(strcrypt);
-    // }
-    Serial.printf("%d,", timeDecodeCrypt);
-
-    Serial.printf("%d,", numeroSerie);
-
-    Serial.print(ESP.getFreePsram());
-    Serial.printf("\n");
   }
 }
 
@@ -2355,7 +2374,7 @@ void changeDirEmotion(int intDirEmotion) {
   sprintf(name_directory, "/%02d/%02d", intDirEmotion, intthemeChoice);
 
   intNbAudioFileInDir = 0;
-  listDir(SD, name_directory, 1);
+  //listDir(SD, name_directory, 1);
 
   nextSong = 0;
 
@@ -2511,6 +2530,12 @@ void loop_usb() {
   //reset watchdog
   esp_task_wdt_reset();
 
+  //uart config
+  uartConfig();
+
+  //log data
+  logUart(0);
+
   //activate detection button
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
   lightLevel = digitalRead(PIN_POWER_BOARD_SWITCH_LIGHT);
@@ -2579,8 +2604,6 @@ void loop_usb() {
     }
     FastLED.show();
     delay(50);
-
-    Serial.println(lightLevel);
   }
 
 
@@ -2604,7 +2627,8 @@ void loop_usb() {
 
       // convert json and print
       serializeJson(jsonConfig, jsonString);
-      Serial.println(jsonString);
+      //Serial.println(jsonString);   //not secure see password uart
+      Serial.println("BOOT APPLICATIVE MODE");
 
       //save on preference flash
       //preference on flash data etain after reboot
@@ -2634,7 +2658,7 @@ void loop_usb() {
         leds2[3] = CRGB(0, 0, 0);
         ii++;
         if (ii >= 4) ii = 0;
-        leds2[ii] = CRGB(0, 90, 0);
+        leds2[ii] = CRGB(0, 250, 0);
         FastLED.show();
         delay(100);
       }  //for watchdog
@@ -2809,7 +2833,7 @@ void uartConfig(void) {
   }
 
   // Si la chaîne JSON n'est pas vide
-  if ((receivedUartConfig.length() > 0) && (updateConfig == 1)) {
+  if ((receivedUartConfig.length() > 0) && (receivedUartConfig.length() < 120) && (updateConfig == 1)) {
     updateConfig = 0;  //update only when receive data
     // Désérialiser le JSON
     DeserializationError error = deserializeJson(jsonConfig, receivedUartConfig);
@@ -2818,8 +2842,8 @@ void uartConfig(void) {
 
     // Vérifier les erreurs de désérialisation
     if (error) {
-      Serial.print("Erreur de désérialisation : ");
-      Serial.println(error.c_str());
+      Serial.println("Data format error");
+      //Serial.println(error.c_str());
     } else {
       // Extraire les valeurs du JSON
       String acces = jsonConfig["acces"];
@@ -2828,7 +2852,7 @@ void uartConfig(void) {
       int th6 = jsonConfig["th6"];
       int th7 = jsonConfig["th7"];
       long int sn = jsonConfig["sn"];
-      int uartdb = jsonConfig["uartdb"];
+      uartdbg = jsonConfig["uartdbg"];
 
       // Faire quelque chose avec les valeurs extraites
       // Serial.println("Accès : " + acces);
@@ -2837,10 +2861,10 @@ void uartConfig(void) {
       // Serial.println("Th6 : " + String(th6));
       // Serial.println("Th7 : " + String(th7));
       // Serial.println("SN : " + String(sn));
-      // Serial.println("UARTDB : " + String(uartdb));
+      // Serial.println("UARTDBG : " + String(uartdbg));
 
       if (acces == "fillthegoodpassword") {
-        Serial.println("ACCESS AUTHORIZE");
+        Serial.println("ACCESS ALLOWED");
 
         preferences.begin("my-app", false);
 
@@ -2864,13 +2888,22 @@ void uartConfig(void) {
           numeroSerie = sn;
           preferences.putLong("sn", sn);
         }
+        if ((uartdbg == 0) || (uartdbg == 1)) {
+          preferences.putUInt("uartdbg", uartdbg);
+        }
 
         // Close the Preferences
         preferences.end();
 
       } else {
-        Serial.println("ACCESS NOT AUTHORIZE");
+        Serial.println("ACCESS NOT ALLOWED");
       }
     }
   }
+
+  if (receivedUartConfig.length() > 120) {
+    Serial.println("Data format error");
+  }
+
+  receivedUartConfig = "";
 }
