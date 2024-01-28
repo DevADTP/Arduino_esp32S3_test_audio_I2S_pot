@@ -272,50 +272,55 @@ int intCmptRotSw9 = 0;
 int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
 
 //seuil ADC theme generique
-//int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2947, 3530 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
 
-//carte 01 S48-2023 -> livraison 25/01/2024  -> problem boot button
-int intMatTheme[8] = { 0, 3015, 1922, 8000, 9000, 10000, 2920, 3492 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+//carte 01 S45-2023 -> Dev board cirly  manque mos batterie (conso permanante 16.8µA 4.2V@250kohms)
+//int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 . . . 6 7
 
 //carte 02 S45-2023 -> Dev board cirly
-//int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 . . . 6 7
+
+
+//carte 01 S48-2023 -> livraison 25/01/2024  -> problem boot button   ******************PROBLEM PROBLEM PROBLEM****************************
+//int intMatTheme[8] = { 0, 3015, 1922, 8000, 9000, 10000, 2920, 3492 };  //0 1 2 . . . 6 7
 
 //carte 02 S48-2023 -> Dev board
-//int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+//int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 . . . 6 7
 
 //carte 03 S48-2023 -> livraison
-//int intMatTheme[8] = { 0, 3143, 2007, 8000, 9000, 10000, 3041, 3611 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
-
-//carte 05 S48-2023 -> livraison
-//int intMatTheme[8] = { 0, 3143, 2008, 8000, 9000, 10000, 3035, 3605 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
-
-//carte 09 S48-2023 -> livraison
-//int intMatTheme[8] = { 0, 3150, 2013, 8000, 9000, 10000, 3050, 3628 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
-
-//carte 10 S48-2023 -> livraison 25/01/2024  -> problem boot button
-//int intMatTheme[8] = { 0, 3191, 2037, 8000, 9000, 10000, 3094, 3652 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
-
-//carte 11 S48-2023 -> livraison 25/01/2024
-//int intMatTheme[8] = { 0, 3083, 1966, 8000, 9000, 10000, 2983, 3547 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
-
-//carte 06 S48-2023 -> livraison 25/01/2024
-//int intMatTheme[8] = { 0, 3123, 1992, 8000, 9000, 10000, 3020, 3606 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+//int intMatTheme[8] = { 0, 3143, 2007, 8000, 9000, 10000, 3041, 3611 };  //0 1 2 . . . 6 7
 
 //carte 04 S48-2023 -> livraison 25/01/2024
-//int intMatTheme[8] = { 0, 3109, 1980, 8000, 9000, 10000, 3012, 3570 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+//int intMatTheme[8] = { 0, 3109, 1980, 8000, 9000, 10000, 3012, 3570 };  //0 1 2 . . . 6 7
 
-//carte 08 S48-2023 -> livraison 25/01/2024  -> problem boot button
-//int intMatTheme[8] = { 0, 3109, 1980, 8000, 9000, 10000, 3012, 3570 };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+//carte 05 S48-2023 -> livraison
+//int intMatTheme[8] = { 0, 3143, 2008, 8000, 9000, 10000, 3035, 3605 };  //0 1 2 . . . 6 7
 
-//carte 07 S48-2023 -> livraison 25/01/2024 -> probleme CC
-//int intMatTheme[8] = { 0, xxxx, xxxx, 8000, 9000, 10000, xxxx, xxxx };  //0 1 2 . . . 6 7  { 0, 3045, 1939, 3254, 2590, 3406, 2947, 3530 }
+//carte 06 S48-2023 -> livraison 25/01/2024
+//int intMatTheme[8] = { 0, 3123, 1992, 8000, 9000, 10000, 3020, 3606 };  //0 1 2 . . . 6 7
+
+//carte 07 S48-2023 -> livraison 25/01/2024 -> probleme CC            ******************PROBLEM PROBLEM PROBLEM CC ************************
+//int intMatTheme[8] = { 0, xxxx, xxxx, 8000, 9000, 10000, xxxx, xxxx };  //0 1 2 . . . 6 7
+
+//carte 08 S48-2023 -> livraison 25/01/2024  -> problem boot button   ******************PROBLEM PROBLEM PROBLEM****************************
+//int intMatTheme[8] = { 0, 3109, 1980, 8000, 9000, 10000, 3012, 3570 };  //0 1 2 . . . 6 7
+
+//carte 09 S48-2023 -> livraison
+//int intMatTheme[8] = { 0, 3150, 2013, 8000, 9000, 10000, 3050, 3628 };  //0 1 2 . . . 6 7
+
+//carte 10 S48-2023 -> livraison 25/01/2024  -> problem boot button   ******************PROBLEM PROBLEM PROBLEM****************************
+//int intMatTheme[8] = { 0, 3191, 2037, 8000, 9000, 10000, 3094, 3652 };  //0 1 2 . . . 6 7
+
+//carte 11 S48-2023 -> livraison 25/01/2024
+//int intMatTheme[8] = { 0, 3083, 1966, 8000, 9000, 10000, 2983, 3547 };  //0 1 2 . . . 6 7
+
+
 
 int intVarAdc = 50;  //ecart adc 10 -> 50
 
-long int numeroSerie = 2023480001;
+long int numeroSerie = 2023450002;
 
-  //button light
-  int buttonlightLevel = 0;
+//button light
+int buttonlightLevel = 0;
 int oldButtonlightLevel = 0;
 int lightLevel = 0;
 
@@ -372,6 +377,8 @@ volatile uint8_t tick_tock = 1;
 //Json for config
 DynamicJsonDocument jsonConfig(1024);
 String jsonString;
+String receivedUartConfig = "";
+int updateConfig = 0;
 
 //preference for boot
 Preferences preferences;
@@ -435,6 +442,7 @@ ___________                   __  .__
 */
 void change_song(void);
 void logUart(void);
+void uartConfig(void);
 int themeSelect(void);
 void readBatLevel(void);
 void ledBatteryLevel(void);
@@ -530,8 +538,8 @@ void intExpIoSw9() {
 void setup() {
   //auto maintain power of the board when start
   //DO activate when R22 100K remove
-  pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
-  delay(200);
+  // pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
+  // delay(200);
 
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
   digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
@@ -550,6 +558,13 @@ void setup() {
   // Note: Key name is limited to 15 chars.
   bootMode2 = preferences.getUInt("bootmode", 0);
   modeRandNorm = preferences.getUInt("audioread", 1);  //random if not define
+
+  //new prefs
+  intMatTheme[1] = preferences.getUInt("th1", 0);
+  intMatTheme[2] = preferences.getUInt("th2", 0);
+  intMatTheme[6] = preferences.getUInt("th6", 0);
+  intMatTheme[7] = preferences.getUInt("th7", 0);
+  numeroSerie = preferences.getLong("sn", 0);
 
   // Increase counter by 1
   //bootMode2++;
@@ -1139,6 +1154,9 @@ void loop_veilleuse() {
 
   //log data
   logUart();
+
+  //uart config
+  uartConfig();
 
   //update dispay time
   if (WIFI_ACTIVE == 1) {
@@ -2371,6 +2389,12 @@ void changeGainJack(void) {
 |______/ /_______  / |______  / /____  > |__| |__|\___  >__|_ \
                  \/         \/       \/               \/     \/
 //USB key function
+               __                                ___.    
+  ______ _____/  |_ __ ________      __ __  _____\_ |__  
+ /  ___// __ \   __\  |  \____ \    |  |  \/  ___/| __ \ 
+ \___ \\  ___/|  | |  |  /  |_> >   |  |  /\___ \ | \_\ \
+/____  >\___  >__| |____/|   __/____|____//____  >|___  /
+     \/     \/           |__| /_____/          \/     \/ 
 --------------------------------------------------------------------------------------------
 */
 // the setup function runs once when you press reset or power the board
@@ -2472,6 +2496,14 @@ void setup_usb() {
 }
 
 
+/*
+.__                                        ___.    
+|  |   ____   ____ ______      __ __  _____\_ |__  
+|  |  /  _ \ /  _ \\____ \    |  |  \/  ___/| __ \ 
+|  |_(  <_> |  <_> )  |_> >   |  |  /\___ \ | \_\ \
+|____/\____/ \____/|   __/____|____//____  >|___  /
+                   |__| /_____/          \/     \/ 
+*/
 
 void loop_usb() {
   nowTimeMillis = millis();
@@ -2761,4 +2793,84 @@ void decryptFile(const char *encryptedFileName, const char *decryptedFileName) {
   decryptedFile.close();
 
   Serial.println("Déchiffrement terminé.");
+}
+
+
+
+void uartConfig(void) {
+
+  while (Serial.available() > 0) {
+    updateConfig = 1;
+    char incomingChar = Serial.read();
+    receivedUartConfig += incomingChar;
+    delay(2);  // Attendre un court instant pour permettre la réception de données
+               //wathdog reset
+    esp_task_wdt_reset();
+  }
+
+  // Si la chaîne JSON n'est pas vide
+  if ((receivedUartConfig.length() > 0) && (updateConfig == 1)) {
+    updateConfig = 0;  //update only when receive data
+    // Désérialiser le JSON
+    DeserializationError error = deserializeJson(jsonConfig, receivedUartConfig);
+
+    receivedUartConfig = "";
+
+    // Vérifier les erreurs de désérialisation
+    if (error) {
+      Serial.print("Erreur de désérialisation : ");
+      Serial.println(error.c_str());
+    } else {
+      // Extraire les valeurs du JSON
+      String acces = jsonConfig["acces"];
+      int th1 = jsonConfig["th1"];
+      int th2 = jsonConfig["th2"];
+      int th6 = jsonConfig["th6"];
+      int th7 = jsonConfig["th7"];
+      long int sn = jsonConfig["sn"];
+      int uartdb = jsonConfig["uartdb"];
+
+      // Faire quelque chose avec les valeurs extraites
+      // Serial.println("Accès : " + acces);
+      // Serial.println("Th1 : " + String(th1));
+      // Serial.println("Th2 : " + String(th2));
+      // Serial.println("Th6 : " + String(th6));
+      // Serial.println("Th7 : " + String(th7));
+      // Serial.println("SN : " + String(sn));
+      // Serial.println("UARTDB : " + String(uartdb));
+
+      if (acces == "fillthegoodpassword") {
+        Serial.println("ACCESS AUTHORIZE");
+
+        preferences.begin("my-app", false);
+
+        if (th1 != 0) {
+          intMatTheme[1] = th1;
+          preferences.putUInt("th1", th1);
+        }
+        if (th2 != 0) {
+          intMatTheme[2] = th2;
+          preferences.putUInt("th2", th2);
+        }
+        if (th6 != 0) {
+          intMatTheme[6] = th6;
+          preferences.putUInt("th6", th6);
+        }
+        if (th7 != 0) {
+          intMatTheme[7] = th7;
+          preferences.putUInt("th7", th7);
+        }
+        if (sn != 0) {
+          numeroSerie = sn;
+          preferences.putLong("sn", sn);
+        }
+
+        // Close the Preferences
+        preferences.end();
+
+      } else {
+        Serial.println("ACCESS NOT AUTHORIZE");
+      }
+    }
+  }
 }
