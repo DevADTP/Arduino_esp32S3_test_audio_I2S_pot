@@ -1807,9 +1807,11 @@ void logUart(int modeuart) {
 
   //ADC theme|theme1-5|ADC user|led_status|emotion|nb_files|volume0-21|jack cnt|jack insert|bat voltage|charge status|bootMode|modeRandNorm|PSRAM
   if ((millis() > updateLogUart) && ((DEBUG_UART == 1) || (uartdbg == 1))) {
-    if (modeuart == 1) {
-      updateLogUart = millis() + PERIOD_LOG_UART;
+    //init prio dens uart
+    updateLogUart = millis() + PERIOD_LOG_UART;
 
+    if (modeuart == 1) {
+    
       Serial.printf("%d,", analogSwitchTheme);
 
       //Méditation Yoga Musique Histoire Bruit Blanc
@@ -2374,7 +2376,7 @@ void changeDirEmotion(int intDirEmotion) {
   sprintf(name_directory, "/%02d/%02d", intDirEmotion, intthemeChoice);
 
   intNbAudioFileInDir = 0;
-  //listDir(SD, name_directory, 1);
+  listDir(SD, name_directory, 1);
 
   nextSong = 0;
 
