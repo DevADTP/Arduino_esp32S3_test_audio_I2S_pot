@@ -269,7 +269,20 @@ int modeRandNorm = 1;  //0:normal  1:random
 //switch theme 5 positions
 int intDetectExpIoSw9 = 0;
 int intCmptRotSw9 = 0;
+
 int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
+
+/*
+0     1   colere        
+8     2   tristesse     
+16    3   peur            
+32    4   anxiete    -> mon moment a moi    
+64    5   jalousie      
+128   6   joie        
+256   7   fatigue    -> S'endormir  
+512   8   reveil     -> Se reveiller  
+1024  9   contenue libre 
+*/
 
 //seuil ADC theme generique
 
@@ -1206,7 +1219,7 @@ void loop_veilleuse() {
       fadeOutLed();
 
       Serial.println("POWER OFF");
-      for (ii = 10; ii >= 0; ii--) {
+      for (ii = 2; ii >= 0; ii--) {
         Serial.println(ii);
         delay(1000);
         esp_task_wdt_reset();
@@ -1811,7 +1824,7 @@ void logUart(int modeuart) {
     updateLogUart = millis() + PERIOD_LOG_UART;
 
     if (modeuart == 1) {
-    
+
       Serial.printf("%d,", analogSwitchTheme);
 
       //Méditation Yoga Musique Histoire Bruit Blanc
