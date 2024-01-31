@@ -416,6 +416,8 @@ char *keycrypt = KEY_AES128;
 
 unsigned char decrypredData[16] = { 0 };
 unsigned char encrypredData[16] = { 0 };
+unsigned char decrypredDataBig[2048] = { 0 };
+unsigned char encrypredDataBig[2048] = { 0 };
 uint32_t nrOfDecryptedBytes = 16;
 char strcrypt[3];
 
