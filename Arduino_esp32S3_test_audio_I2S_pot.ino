@@ -330,7 +330,12 @@ int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 
 //ADC flucutation for thema
 int intVarAdc = 50;  //ecart adc 10 -> 50
 
+//info device
 long int numeroSerie = 2023539999;
+int verSw = 0101;
+int verHw = 0201;
+int gainHp = 1;
+int gainCasq = 1;
 
 //debug uart
 int uartdbg = 1;
@@ -583,6 +588,12 @@ void setup() {
   intMatTheme[6] = preferences.getUInt("th6", 0);
   intMatTheme[7] = preferences.getUInt("th7", 0);
   numeroSerie = preferences.getLong("sn", 0);
+
+  verSw = preferences.getUInt("sw", 0);
+  verHw = preferences.getUInt("hw", 0);
+  gainHp = preferences.getUInt("gh", 0);
+  gainCasq = preferences.getUInt("gc", 0);
+
   uartdbg = preferences.getUInt("uartdbg", 1);  //uart debug by default
 
   // Increase counter by 1
@@ -1832,7 +1843,7 @@ void logUart(int modeuart) {
       //Méditation Yoga Musique Histoire Bruit Blanc
       Serial.printf("%d,", intthemeChoice);  //THEMES Sub directory
 
-      Serial.printf("%d,", analogSwitchuser);
+      //Serial.printf("%d,", analogSwitchuser);
 
       Serial.printf("%d,", flipLight);  //led status
 
@@ -1853,6 +1864,12 @@ void logUart(int modeuart) {
 
       Serial.printf("%d,", modeRandNorm);
 
+      Serial.printf("%d,", verSw);
+      Serial.printf("%d,", verHw);
+      Serial.printf("%d,", gainHp);
+      Serial.printf("%d,", gainCasq);
+
+
       if (WEBSOCKET == 1) {
         //print ip
         Serial.print(WiFi.localIP());
@@ -1865,7 +1882,7 @@ void logUart(int modeuart) {
       //   sprintf(strcrypt, "%02x", (int)outputcrypt[i]);
       //   Serial.print(strcrypt);
       // }
-      Serial.printf("%d,", timeDecodeCrypt);
+      //Serial.printf("%d,", timeDecodeCrypt);
 
       Serial.printf("%d,", numeroSerie);
 
@@ -2850,7 +2867,7 @@ void uartConfig(void) {
   }
 
   // Si la chaîne JSON n'est pas vide
-  if ((receivedUartConfig.length() > 0) && (receivedUartConfig.length() < 120) && (updateConfig == 1)) {
+  if ((receivedUartConfig.length() > 0) && (receivedUartConfig.length() < 150) && (updateConfig == 1)) {
     updateConfig = 0;  //update only when receive data
     // Désérialiser le JSON
     DeserializationError error = deserializeJson(jsonConfig, receivedUartConfig);
@@ -2870,6 +2887,11 @@ void uartConfig(void) {
       int th7 = jsonConfig["th7"];
       long int sn = jsonConfig["sn"];
       uartdbg = jsonConfig["uartdbg"];
+      verSw = jsonConfig["sw"];
+      verHw = jsonConfig["hw"];
+      gainHp = jsonConfig["gh"];
+      gainCasq = jsonConfig["gc"];
+
 
       // Faire quelque chose avec les valeurs extraites
       // Serial.println("Accès : " + acces);
@@ -2884,6 +2906,19 @@ void uartConfig(void) {
         Serial.println("ACCESS ALLOWED");
 
         preferences.begin("my-app", false);
+
+        if (verSw != 0) {
+          preferences.putUInt("sw", verSw);
+        }
+        if (verHw != 0) {
+          preferences.putUInt("hw", verHw);
+        }
+        if (gainHp != 0) {
+          preferences.putUInt("gh", gainHp);
+        }
+        if (gainCasq != 0) {
+          preferences.putUInt("gc", gainCasq);
+        }
 
         if (th1 != 0) {
           intMatTheme[1] = th1;
@@ -2908,6 +2943,44 @@ void uartConfig(void) {
         if ((uartdbg == 0) || (uartdbg == 1)) {
           preferences.putUInt("uartdbg", uartdbg);
         }
+
+        //read prefs
+        Serial.print("bootmode:");
+        Serial.println(preferences.getUInt("bootmode", 0));
+
+        Serial.print("audioread:");
+        Serial.println(preferences.getUInt("audioread", 0));
+
+        Serial.print("th1:");
+        Serial.println(preferences.getUInt("th1", 0));
+        Serial.print("th2:");
+        Serial.println(preferences.getUInt("th2", 0));
+        Serial.print("v:");
+        Serial.println(preferences.getUInt("th6", 0));
+        Serial.print("th7:");
+        Serial.println(preferences.getUInt("th7", 0));
+
+        Serial.print("sn:");
+        Serial.println(preferences.getLong("sn", 0));
+
+        Serial.print("sw:");
+        Serial.println(preferences.getUInt("sw", 0));
+        Serial.print("hw:");
+        Serial.println(preferences.getUInt("hw", 0));
+        Serial.print("gh:");
+        Serial.println(preferences.getUInt("gh", 0));
+        Serial.print("gc:");
+        Serial.println(preferences.getUInt("gc", 0));
+
+        Serial.print("uartdbg:");
+        Serial.println(preferences.getUInt("uartdbg", 0));
+
+        //reload data
+        verSw = preferences.getUInt("sw", 0);
+        verHw = preferences.getUInt("hw", 0);
+        gainHp = preferences.getUInt("gh", 0);
+        gainCasq = preferences.getUInt("gc", 0);
+        uartdbg = preferences.getUInt("uartdbg", 1);  //uart debug by default
 
         // Close the Preferences
         preferences.end();
