@@ -464,6 +464,7 @@ ___________                   __  .__
 --------------------------------------------------------------------------------------------
 */
 void change_song(void);
+void change_song_name(void);
 void logUart(int modeuart);
 void uartConfig(void);
 int themeSelect(void);
@@ -495,6 +496,8 @@ void appendFile(fs::FS &fs, const char *path, const char *message);
 void renameFile(fs::FS &fs, const char *path1, const char *path2);
 void deleteFile(fs::FS &fs, const char *path);
 void testFileIO(fs::FS &fs, const char *path);
+
+int choisirFichierAleatoire(const char *cheminDossier);
 
 void printLocalTime();
 
@@ -1393,7 +1396,8 @@ void loop_veilleuse() {
         Serial.println("Next Song click");
         if (TEST_LED == 0) {
           if (AUDIO_ACTIVE == 1) {
-            change_song();
+            change_song_name();
+            //change_song();
           }
         } else {
           int_test_led = int_test_led + 10;
@@ -1763,7 +1767,8 @@ void audio_eof_mp3(const char *info) {  //end of file
 
   nextSong++;
   Serial.println("Next Song autoloop");
-  change_song();
+  change_song_name();
+  //change_song();
 }
 
 //audio info I2S
@@ -1774,7 +1779,7 @@ void audio_info(const char *info) {
 
 
 void change_song(void) {
-  char local_name_directory[100] = "/09";
+  char local_name_directory[200] = "/09";
 
   //gestion of normal or random
   if (modeRandNorm == 1) {
@@ -2996,4 +3001,138 @@ void uartConfig(void) {
   }
 
   receivedUartConfig = "";
+}
+
+char fichierChoisi[100];
+
+void change_song_name(void) {
+  char local_name_directory[200] = "";
+
+  //get emotion
+
+  switch (intNumeroDossier) {
+    case 1:
+      // Joie
+      sprintf(local_name_directory, "/Joie");
+      break;
+    case 2:
+      // Jalousie
+      sprintf(local_name_directory, "/Jalousie");
+      break;
+    case 3:
+      // Mon moment à moi
+      sprintf(local_name_directory, "/Mon moment à moi");
+      break;
+    case 4:
+      // Contenu libre
+      sprintf(local_name_directory, "/Contenu libre");
+      break;
+    case 5:
+      // S'endormir
+      sprintf(local_name_directory, "/S'endormir");
+      break;
+    case 6:
+      // Se reveiller
+      sprintf(local_name_directory, "/Se reveiller");
+      break;
+    case 7:
+      // Tristesse
+      sprintf(local_name_directory, "/Tristesse");
+      break;
+    case 8:
+      // Colère
+      sprintf(local_name_directory, "/Colère");
+      break;
+    case 9:
+      // Peur
+      sprintf(local_name_directory, "/Peur");
+      break;
+    default:
+      // Contenu libre
+      sprintf(local_name_directory, "/Contenu libre");
+      break;
+  }
+
+
+  //get thema
+
+  switch (intthemeChoice) {
+    case 1:
+      // Méditations
+      sprintf(local_name_directory, "%s/Méditations", local_name_directory);
+      break;
+    case 2:
+      // Activités
+      sprintf(local_name_directory, "%s/Activités", local_name_directory);
+      break;
+    case 3:
+      // Musiques
+      sprintf(local_name_directory, "%s/Musiques", local_name_directory);
+      break;
+    case 4:
+      // Histoires
+      sprintf(local_name_directory, "%s/Histoires", local_name_directory);
+      break;
+    case 5:
+      // Bruits Blancs et sons nature
+      sprintf(local_name_directory, "%s/Bruits Blancs et sons nature", local_name_directory);
+      break;
+    default:
+      //Musiques
+      sprintf(local_name_directory, "%s/Musiques", local_name_directory);
+      break;
+  }
+
+
+  //Serial.println(local_name_directory);
+  if (modeRandNorm == 1) {
+    //random mode
+    choisirFichierAleatoire(local_name_directory);
+    //Serial.print("Fichier choisi aléatoirement : ");
+    //Serial.println(fichierChoisi);
+
+    sprintf(local_name_directory, "%s/%s", local_name_directory, fichierChoisi);
+    //Serial.print("Fichier choisi aléatoirement : ");
+
+    audio.connecttoSD(local_name_directory);
+    Serial.println(local_name_directory);
+
+  } else {
+    //normal mode
+
+  }
+}
+
+
+
+
+
+int choisirFichierAleatoire(const char *cheminDossier) {
+  File repertoire = SD.open(cheminDossier);
+
+  if (!repertoire) {
+    Serial.println("Failed to open directory");
+    return -1;
+  }
+  if (!repertoire.isDirectory()) {
+    Serial.println("Not a directory");
+    return -1;
+  }
+
+  int nombreFichiers = 0;
+  while (File fichier = repertoire.openNextFile()) {
+    nombreFichiers++;
+    if (random(0, nombreFichiers) == 0) {
+      //fichierChoisi = fichier.name();
+      strcpy(fichierChoisi, "");
+      strcat(fichierChoisi, fichier.name());
+    }
+    fichier.close();
+
+    //reset watchdog
+    esp_task_wdt_reset();
+  }
+  repertoire.close();
+
+  return 0;
 }
