@@ -2849,6 +2849,13 @@ void Audio::processLocalFile() {
 	// ----------- METHODE 2 ------------
 	//AUDIO_INFO("availableBytes %d", availableBytes);
     //AUDIO_INFO("freespace %d", InBuff.freeSpace());
+	
+	//AUDIO_INFO("f_fileDataComplete %d", f_fileDataComplete);
+	//AUDIO_INFO("InBuff.bufferFilled %d", InBuff.bufferFilled());
+	//AUDIO_INFO("InBuff.getMaxBlockSize %d", InBuff.getMaxBlockSize());
+	
+	//stop condition eof
+	//if(f_fileDataComplete && InBuff.bufferFilled() < InBuff.getMaxBlockSize())
 		
 	if(availableBytes > 2048)
 	{
@@ -2898,7 +2905,7 @@ void Audio::processLocalFile() {
 #else
 	int32_t bytesAddedToBuffer = audiofile.read(InBuff.getWritePtr(), availableBytes);
 #endif
-	
+
 
     if(bytesAddedToBuffer > 0) {
         byteCounter += bytesAddedToBuffer;  // Pull request #42
@@ -2951,7 +2958,15 @@ void Audio::processLocalFile() {
     }
 
     // end of file reached? - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    if(f_fileDataComplete && InBuff.bufferFilled() < InBuff.getMaxBlockSize()){
+
+#ifdef _MODIF_SULSULDEV
+	//sulsuldev	
+	if((InBuff.bufferFilled() +64) > InBuff.getMaxBlockSize()) f_fileDataComplete=true;
+	if(f_fileDataComplete && (InBuff.bufferFilled()) < InBuff.getMaxBlockSize()){
+#else
+	if(f_fileDataComplete && InBuff.bufferFilled() < InBuff.getMaxBlockSize()){
+#endif
+    //if(f_fileDataComplete && InBuff.bufferFilled() < InBuff.getMaxBlockSize()){
 
         if(InBuff.bufferFilled()){
             if(!readID3V1Tag()){

@@ -1393,7 +1393,8 @@ void loop_veilleuse() {
       // only toggle the LED if the new button state is HIGH
       if (buttonStateNext == HIGH) {
         nextSong++;
-        Serial.println("Next Song click");
+        Serial.print("Next Song click: songs ");
+        Serial.println(intNbAudioFileInDir);
         if (TEST_LED == 0) {
           if (AUDIO_ACTIVE == 1) {
             change_song_name();
@@ -1762,11 +1763,12 @@ void printLocalTime() {
 
 //auto loop directory
 void audio_eof_mp3(const char *info) {  //end of file
-  Serial.print("audio_info: ");
+  Serial.print("audio_info eof: ");
   Serial.println(info);
 
   nextSong++;
-  Serial.println("Next Song autoloop");
+  Serial.print("Next Song autoloop : songs ");
+  Serial.println(intNbAudioFileInDir);
   change_song_name();
   //change_song();
 }
@@ -3009,7 +3011,6 @@ void change_song_name(void) {
   char local_name_directory[200] = "";
 
   //get emotion
-
   switch (intNumeroDossier) {
     case 1:
       // Joie
@@ -3028,12 +3029,12 @@ void change_song_name(void) {
       sprintf(local_name_directory, "/Contenu libre");
       break;
     case 5:
-      // S'endormir
-      sprintf(local_name_directory, "/S'endormir");
+      // Je m'endors paisiblement
+      sprintf(local_name_directory, "/Je m'endors paisiblement");
       break;
     case 6:
-      // Se reveiller
-      sprintf(local_name_directory, "/Se reveiller");
+      // Je me réveille de bonne humeur
+      sprintf(local_name_directory, "/Je me réveille de bonne humeur");
       break;
     case 7:
       // Tristesse
@@ -3053,9 +3054,7 @@ void change_song_name(void) {
       break;
   }
 
-
   //get thema
-
   switch (intthemeChoice) {
     case 1:
       // Méditations
@@ -3066,20 +3065,20 @@ void change_song_name(void) {
       sprintf(local_name_directory, "%s/Activités", local_name_directory);
       break;
     case 3:
-      // Musiques
-      sprintf(local_name_directory, "%s/Musiques", local_name_directory);
+      // Musique
+      sprintf(local_name_directory, "%s/Musique", local_name_directory);
       break;
     case 4:
-      // Histoires
-      sprintf(local_name_directory, "%s/Histoires", local_name_directory);
+      // Histoires audio
+      sprintf(local_name_directory, "%s/Histoires audio", local_name_directory);
       break;
     case 5:
-      // Bruits Blancs et sons nature
-      sprintf(local_name_directory, "%s/Bruits Blancs et sons nature", local_name_directory);
+      // Bruits blancs et sons de la nature
+      sprintf(local_name_directory, "%s/Bruits blancs et sons de la nature", local_name_directory);
       break;
     default:
-      //Musiques
-      sprintf(local_name_directory, "%s/Musiques", local_name_directory);
+      //Musique
+      sprintf(local_name_directory, "%s/Musique", local_name_directory);
       break;
   }
 
@@ -3099,11 +3098,12 @@ void change_song_name(void) {
 
   } else {
     //normal mode
-
+    choisirFichierSuivant(local_name_directory);
+    sprintf(local_name_directory, "%s/%s", local_name_directory, fichierChoisi);
+    audio.connecttoSD(local_name_directory);
+    Serial.println(local_name_directory);
   }
 }
-
-
 
 
 
@@ -3121,8 +3121,44 @@ int choisirFichierAleatoire(const char *cheminDossier) {
 
   int nombreFichiers = 0;
   while (File fichier = repertoire.openNextFile()) {
+    const char* annonce = "000.mp3";
     nombreFichiers++;
-    if (random(0, nombreFichiers) == 0) {
+    if ((random(0, nombreFichiers) == 0) && !(strcmp(fichier.name(), annonce))) {
+      //fichierChoisi = fichier.name();
+      strcpy(fichierChoisi, "");
+      strcat(fichierChoisi, fichier.name());
+    }
+    fichier.close();
+
+    //reset watchdog
+    esp_task_wdt_reset();
+  }
+  repertoire.close();
+
+  return 0;
+}
+
+
+
+int choisirFichierSuivant(const char *cheminDossier) {
+  File repertoire = SD.open(cheminDossier);
+
+  if (!repertoire) {
+    Serial.println("Failed to open directory");
+    return -1;
+  }
+  if (!repertoire.isDirectory()) {
+    Serial.println("Not a directory");
+    return -1;
+  }
+
+  int nombreFichiers = 0;
+
+  if (nextSong >= (intNbAudioFileInDir - 1)) nextSong = 0;  //intNbAudioFileInDir
+
+  while (File fichier = repertoire.openNextFile()) {
+    nombreFichiers++;
+    if (nombreFichiers == nextSong) {
       //fichierChoisi = fichier.name();
       strcpy(fichierChoisi, "");
       strcat(fichierChoisi, fichier.name());
