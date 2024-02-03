@@ -249,6 +249,8 @@ unsigned long longPressButton = 1500;        // long time pressure button
 unsigned long timeoutRefreshLed = 0;         //timeout update led refresh
 unsigned long timeoutAutoOff = 0;            //timeout auto off if not touch TIME_AUTO_OFF
 
+unsigned long timeAutoOff = TIME_AUTO_OFF;
+
 unsigned long timeDecodeCrypt = 0;  //time measure decrytpage
 
 
@@ -600,6 +602,9 @@ void setup() {
   gainCasq = preferences.getUInt("gc", 0);
 
   uartdbg = preferences.getUInt("uartdbg", 1);  //uart debug by default
+
+  timeAutoOff = preferences.getUInt("autooff", 60);  //default 60 min
+  timeAutoOff = timeAutoOff * 60000;
 
   // Increase counter by 1
   //bootMode2++;
@@ -1081,7 +1086,7 @@ void setup_veilleuse() {
 
   lastDebounceTimePlayNext = millis() + longPressPlayNext;
 
-  timeoutAutoOff = millis() + TIME_AUTO_OFF;
+  timeoutAutoOff = millis() + timeAutoOff;
 }  //setup_veilleuse
 
 
@@ -1137,7 +1142,7 @@ void loop_veilleuse() {
 
     if (intOldthemeChoice != intthemeChoice) {
       //update auto-off if action on any button
-      timeoutAutoOff = millis() + TIME_AUTO_OFF;
+      timeoutAutoOff = millis() + timeAutoOff;
 
       intOldthemeChoice = intthemeChoice;
       //change_song();
@@ -1205,7 +1210,7 @@ void loop_veilleuse() {
   intNumeroDossier = readSwitchEmo(0);  //1 direct read  0:wait interrupt for reading
   if (intNumeroDossier != intOldNumeroDossier) {
     //update auto-off if action on any button
-    timeoutAutoOff = millis() + TIME_AUTO_OFF;
+    timeoutAutoOff = millis() + timeAutoOff;
 
     intOldNumeroDossier = intNumeroDossier;
     changeDirEmotion(intNumeroDossier);
@@ -1219,7 +1224,7 @@ void loop_veilleuse() {
     if (oldButtonlightLevel == 0 && buttonlightLevel == 1) {
 
       //update auto-off if action on any button
-      timeoutAutoOff = millis() + TIME_AUTO_OFF;
+      timeoutAutoOff = millis() + timeAutoOff;
       flipLight++;
       ledlight();
 
@@ -1325,7 +1330,7 @@ void loop_veilleuse() {
 
   if (readButPlay != lastButtonPlay) {
     //update auto-off if action on any button
-    timeoutAutoOff = millis() + TIME_AUTO_OFF;
+    timeoutAutoOff = millis() + timeAutoOff;
 
     // reset the debouncing timer
     lastDebounceTimePlay = millis();
@@ -1333,7 +1338,7 @@ void loop_veilleuse() {
 
   if (readButNext != lastButtonNext) {
     //update auto-off if action on any button
-    timeoutAutoOff = millis() + TIME_AUTO_OFF;
+    timeoutAutoOff = millis() + timeAutoOff;
 
     // reset the debouncing timer
     lastDebounceTimeNext = millis();
@@ -1341,7 +1346,7 @@ void loop_veilleuse() {
 
   if (readButNext != lastButtonNextRandom) {
     //update auto-off if action on any button
-    timeoutAutoOff = millis() + TIME_AUTO_OFF;
+    timeoutAutoOff = millis() + timeAutoOff;
 
     // reset the debouncing timer and detect long press RANDOM
     lastLongPressTimeNext = millis();
@@ -1492,7 +1497,7 @@ void loop_veilleuse() {
 
     if (updatevolume == 1) {
       //update auto-off if action on any button
-      timeoutAutoOff = millis() + TIME_AUTO_OFF;
+      timeoutAutoOff = millis() + timeAutoOff;
 
       // Serial.print(valVolume);
       // Serial.print(",");
@@ -3107,6 +3112,8 @@ void uartConfig(void) {
       gainHp = jsonConfig["gh"];
       gainCasq = jsonConfig["gc"];
 
+      int timeAutoOffuart = jsonConfig["autooff"];
+
 
       // Faire quelque chose avec les valeurs extraites
       // Serial.println("Accès : " + acces);
@@ -3121,6 +3128,12 @@ void uartConfig(void) {
         Serial.println("ACCESS ALLOWED");
 
         preferences.begin("my-app", false);
+
+        if (timeAutoOffuart != 0) {
+          preferences.putUInt("autooff", timeAutoOffuart);
+          timeAutoOff = timeAutoOffuart * 60000;
+          timeoutAutoOff = millis() + timeAutoOff;  //relaod autooff
+        }
 
         if (verSw != 0) {
           preferences.putUInt("sw", verSw);
@@ -3187,8 +3200,11 @@ void uartConfig(void) {
         Serial.print("gc:");
         Serial.println(preferences.getUInt("gc", 0));
 
-        Serial.print("uartdbg:");
-        Serial.println(preferences.getUInt("uartdbg", 0));
+        Serial.print("gc:");
+        Serial.println(preferences.getUInt("gc", 0));
+
+        Serial.print("autooff:");
+        Serial.println(preferences.getUInt("autooff", 0));
 
         //reload data
         verSw = preferences.getUInt("sw", 0);
