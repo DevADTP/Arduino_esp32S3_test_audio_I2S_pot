@@ -3197,10 +3197,16 @@ int choisirFichierAleatoire(const char *cheminDossier) {
   }
 
   int nombreFichiers = 0;
+
+  if (nextSong >= intNbAudioFileInDir) nextSong = 0;  //intNbAudioFileInDir not use in random mode
+  Serial.print("songs qty: ");
+  Serial.print(intNbAudioFileInDir);
+  Serial.print("-next: ");
+  Serial.println(nextSong);
+
   while (File fichier = repertoire.openNextFile()) {
-    const char *annonce = "000.mp3";
     nombreFichiers++;
-    if ((random(0, nombreFichiers) == 0) && !(strcmp(fichier.name(), annonce))) {
+    if ((random(0, nombreFichiers) == 0)) {
       //fichierChoisi = fichier.name();
       strcpy(fichierChoisi, "");
       strcat(fichierChoisi, fichier.name());
@@ -3240,7 +3246,7 @@ int choisirFichierSuivant(const char *cheminDossier) {
   Serial.println(nextSong);
 
   while (File fichier = repertoire.openNextFile()) {
-    
+
     if (nombreFichiers == nextSong) {
       //fichierChoisi = fichier.name();
       strcpy(fichierChoisi, "");
