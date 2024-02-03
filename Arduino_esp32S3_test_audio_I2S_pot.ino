@@ -222,7 +222,9 @@ int jj = 0;  //for loop
 long int valVolume = 0;
 long int valVolumeold = 0;
 int updatevolume = 0;
-int jackInserted = 0;              //status jack audio
+int jackInserted = 0;     //status jack audio
+int oldJackInserted = 1;  //status jack audio
+
 int intJackInserted = 0;           //interrupt active
 volatile int jackInsertedCnt = 0;  //counter jack status
 int changeGain = 0;
@@ -1111,8 +1113,6 @@ void loop_veilleuse() {
     delay(20);
   }
 
-  //change gain depending jack inserted
-  //changeGainJack();
 
   //check jack status digital pin not analog
   if (millis() > CheckTimeJackInserted) {
@@ -1120,6 +1120,9 @@ void loop_veilleuse() {
     //jackInsertedCnt = 0;
     attachInterrupt(digitalPinToInterrupt(PIN_ADC_JACK_DETECT), jackChangeInterrupt, CHANGE);
   }
+
+  //change gain depending jack inserted
+  changeGainJack();
 
   //read ADC value switch rotary 5 positions ADC
   if (millis() > updateAdcRead) {
@@ -1393,7 +1396,9 @@ void loop_veilleuse() {
       // only toggle the LED if the new button state is HIGH
       if (buttonStateNext == HIGH) {
         nextSong++;
-        Serial.println("Next Song click");
+        if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+          Serial.println("Next Song click");
+        }
         if (TEST_LED == 0) {
           if (AUDIO_ACTIVE == 1) {
             change_song_name();
@@ -1420,7 +1425,9 @@ void loop_veilleuse() {
       //detect long press no effect
       // only toggle the LED if the new button state is HIGH
       if (buttonStatePlay == HIGH) {
-        Serial.println("Long press PLAY/PAUSE");  //15dB
+        if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+          Serial.println("Long press PLAY/PAUSE");  //15dB
+        }
         if (TEST_GAIN_VOLUME == 0) {
           if (AUDIO_ACTIVE == 1) {
             audio.pauseResume();
@@ -1537,7 +1544,10 @@ void initSDCard() {
 
 
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
-  Serial.printf("Listing directory: %s\n", dirname);
+
+  if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+    Serial.printf("Listing directory: %s\n", dirname);
+  }
 
   File root = fs.open(dirname);
   if (!root) {
@@ -1567,20 +1577,25 @@ void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
 
       intNbAudioFileInDir++;
       char addfullpath[200];
-      Serial.print("  FILE: ");
+
       strcpy(addfullpath, dirname);
       strcat(addfullpath, "/");
       strcat(addfullpath, file.name());
       //Serial.print(file.name());
-      Serial.print(addfullpath);
-      Serial.print("  SIZE: ");
-      Serial.println(file.size());
+      if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+        Serial.print("  FILE: ");
+        Serial.print(addfullpath);
+        Serial.print("  SIZE: ");
+        Serial.println(file.size());
+      }
     }
     file = root.openNextFile();
   }
 
-  Serial.print("File number:");
-  Serial.println(intNbAudioFileInDir);
+  if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+    Serial.print("File number:");
+    Serial.println(intNbAudioFileInDir);
+  }
 }
 
 
@@ -1762,11 +1777,13 @@ void printLocalTime() {
 
 //auto loop directory
 void audio_eof_mp3(const char *info) {  //end of file
-  Serial.print("audio_info eof: ");
-  Serial.println(info);
 
   nextSong++;
-  Serial.println("Next Song autoloop");
+  if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+    Serial.print("audio_info eof: ");
+    Serial.println(info);
+    Serial.println("Next Song autoloop");
+  }
   change_song_name();
   //change_song();
 }
@@ -2303,8 +2320,11 @@ int readSwitchEmo(int bypassInt) {
       attachInterrupt(digitalPinToInterrupt(PIN_INT_SW9), intExpIoSw9, FALLING);
     }
 
-    Serial.print("int SW9:");
-    Serial.println(intCmptRotSw9);
+
+    if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+      Serial.print("int SW9:");
+      Serial.println(intCmptRotSw9);
+    }
 
     // Commencer la communication avec l'esclave à l'adresse 0x74
     Wire.beginTransmission(PI4IOE5V9539_ADDR);
@@ -2342,8 +2362,10 @@ int readSwitchEmo(int bypassInt) {
       selection_emo = intNumeroDossier;
 
     // Afficher la valeur lue
-    Serial.print("Selection : ");
-    Serial.println(selection_emo);
+    if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+      Serial.print("Selection : ");
+      Serial.println(selection_emo);
+    }
     return selection_emo;
 
 
@@ -2354,8 +2376,10 @@ int readSwitchEmo(int bypassInt) {
       delay(2);
       attachInterrupt(digitalPinToInterrupt(PIN_INT_SW9), intExpIoSw9, FALLING);
 
-      Serial.print("int SW9:");
-      Serial.println(intCmptRotSw9);
+      if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+        Serial.print("int SW9:");
+        Serial.println(intCmptRotSw9);
+      }
 
       // Commencer la communication avec l'esclave à l'adresse 0x74
       Wire.beginTransmission(PI4IOE5V9539_ADDR);
@@ -2393,8 +2417,10 @@ int readSwitchEmo(int bypassInt) {
         selection_emo = intNumeroDossier;
 
       // Afficher la valeur lue
-      Serial.print("Selection : ");
-      Serial.println(selection_emo);
+      if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+        Serial.print("Selection : ");
+        Serial.println(selection_emo);
+      }
 
       return selection_emo;
     }
@@ -2408,8 +2434,10 @@ void changeDirEmotion(int intDirEmotion) {
 
   char local_name_directory[200] = "";
 
-  Serial.print("Dossier EMOTION:");
-  Serial.println(intDirEmotion);
+  if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+    Serial.print("Dossier EMOTION:");
+    Serial.println(intDirEmotion);
+  }
 
 
   //get emotion intDirEmotion, intthemeChoice
@@ -2503,16 +2531,119 @@ void changeDirEmotion(int intDirEmotion) {
 
 
 void changeGainJack(void) {
-  if (jackInserted == 1) {
-    //3dB casque
-    pinMode(I2S_GAIN, OUTPUT);
-    digitalWrite(I2S_GAIN, HIGH);
-  } else {
-    //12db haut parleur
-    pinMode(I2S_GAIN, INPUT);
-    //3dB casque
-    pinMode(I2S_GAIN, OUTPUT);
-    digitalWrite(I2S_GAIN, HIGH);
+
+  if (jackInserted != oldJackInserted) {
+    oldJackInserted = jackInserted;
+
+    //reload preferences
+    preferences.begin("my-app", true);  //true readonly
+
+    gainHp = preferences.getUInt("gh", 0);
+    gainCasq = preferences.getUInt("gc", 0);
+
+    // Close the Preferences
+    preferences.end();
+
+    if (jackInserted == 1) {
+
+      if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+        Serial.println("Jack inserted");
+      }
+      //3dB casque
+      // pinMode(I2S_GAIN, OUTPUT);
+      // digitalWrite(I2S_GAIN, HIGH);
+      switch (gainCasq) {
+        case 1:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:3dB");  //GAIN_SLOT=Pull-up 3.3V -> 3 dB
+          }
+          pinMode(I2S_GAIN, INPUT_PULLUP);
+          break;
+        case 2:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:6dB");  //GAIN_SLOT=VDD=3.3V -> 6dB
+          }
+          pinMode(I2S_GAIN, OUTPUT);
+          digitalWrite(I2S_GAIN, HIGH);
+          break;
+        case 3:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:9dB");  //GAIN_SLOT=floating input -> 9dB
+          }
+          pinMode(I2S_GAIN, INPUT);
+          break;
+        case 4:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:12dB");  //GAIN_SLOT=GND -> 12dB
+          }
+          pinMode(I2S_GAIN, OUTPUT);
+          digitalWrite(I2S_GAIN, LOW);
+          break;
+        case 5:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:15dB");  //GAIN_SLOT=Pull-down GND -> 15 dB
+          }
+          pinMode(I2S_GAIN, INPUT_PULLDOWN);
+          break;
+        default:
+          //none
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain: no change");
+          }
+          break;
+      }
+
+    } else {
+
+      if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+        Serial.println("Jack ejected -> HP");
+      }
+      //12db haut parleur
+      // pinMode(I2S_GAIN, INPUT);
+      // //3dB casque
+      // pinMode(I2S_GAIN, OUTPUT);
+      // digitalWrite(I2S_GAIN, HIGH);
+      switch (gainHp) {
+        case 1:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:3dB");  //GAIN_SLOT=Pull-up 3.3V -> 3 dB
+          }
+          pinMode(I2S_GAIN, INPUT_PULLUP);
+          break;
+        case 2:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:6dB");  //GAIN_SLOT=VDD=3.3V -> 6dB
+          }
+          pinMode(I2S_GAIN, OUTPUT);
+          digitalWrite(I2S_GAIN, HIGH);
+          break;
+        case 3:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:9dB");  //GAIN_SLOT=floating input -> 9dB
+          }
+          pinMode(I2S_GAIN, INPUT);
+          break;
+        case 4:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:12dB");  //GAIN_SLOT=GND -> 12dB
+          }
+          pinMode(I2S_GAIN, OUTPUT);
+          digitalWrite(I2S_GAIN, LOW);
+          break;
+        case 5:
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain:15dB");  //GAIN_SLOT=Pull-down GND -> 15 dB
+          }
+          pinMode(I2S_GAIN, INPUT_PULLDOWN);
+          break;
+        default:
+          //none
+          if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+            Serial.println("gain: no change");
+          }
+          break;
+      }
+    }
   }
 }
 
@@ -3024,7 +3155,7 @@ void uartConfig(void) {
           numeroSerie = sn;
           preferences.putLong("sn", sn);
         }
-        if ((uartdbg == 0) || (uartdbg == 1)) {
+        if ((uartdbg == 0) || (uartdbg == 1) || (uartdbg == 2)) {
           preferences.putUInt("uartdbg", uartdbg);
         }
 
@@ -3171,14 +3302,18 @@ void change_song_name(void) {
     //Serial.print("Fichier choisi aléatoirement : ");
 
     audio.connecttoSD(local_name_directory);
-    Serial.println(local_name_directory);
+    if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+      Serial.println(local_name_directory);
+    }
 
   } else {
     //normal mode
     choisirFichierSuivant(local_name_directory);
     sprintf(local_name_directory, "%s/%s", local_name_directory, fichierChoisi);
     audio.connecttoSD(local_name_directory);
-    Serial.println(local_name_directory);
+    if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+      Serial.println(local_name_directory);
+    }
   }
 }
 
@@ -3199,10 +3334,13 @@ int choisirFichierAleatoire(const char *cheminDossier) {
   int nombreFichiers = 0;
 
   if (nextSong >= intNbAudioFileInDir) nextSong = 0;  //intNbAudioFileInDir not use in random mode
-  Serial.print("songs qty: ");
-  Serial.print(intNbAudioFileInDir);
-  Serial.print("-next: ");
-  Serial.println(nextSong);
+
+  if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+    Serial.print("songs qty: ");
+    Serial.print(intNbAudioFileInDir);
+    Serial.print("-next: ");
+    Serial.println(nextSong);
+  }
 
   while (File fichier = repertoire.openNextFile()) {
     nombreFichiers++;
@@ -3240,10 +3378,12 @@ int choisirFichierSuivant(const char *cheminDossier) {
   //if (nextSong >= (intNbAudioFileInDir - 1)) nextSong = 0;  //intNbAudioFileInDir
   if (nextSong >= intNbAudioFileInDir) nextSong = 0;  //intNbAudioFileInDir
 
-  Serial.print("songs qty: ");
-  Serial.print(intNbAudioFileInDir);
-  Serial.print("-next: ");
-  Serial.println(nextSong);
+  if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+    Serial.print("songs qty: ");
+    Serial.print(intNbAudioFileInDir);
+    Serial.print("-next: ");
+    Serial.println(nextSong);
+  }
 
   while (File fichier = repertoire.openNextFile()) {
 
