@@ -523,6 +523,11 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
 //encryption
 void decryptFile(const char *encryptedFileName, const char *decryptedFileName);
 
+//file classification
+bool hasMp3Extension(const char *filename);
+int fileClassifiation(void);
+bool containsSubstring(const char *filename, const char *substring);
+
 
 
 /*
@@ -1087,6 +1092,10 @@ void setup_veilleuse() {
   lastDebounceTimePlayNext = millis() + longPressPlayNext;
 
   timeoutAutoOff = millis() + timeAutoOff;
+
+  //file classifiation if add in usb mode at root
+  fileClassifiation();
+
 }  //setup_veilleuse
 
 
@@ -3417,4 +3426,277 @@ int choisirFichierSuivant(const char *cheminDossier) {
   repertoire.close();
 
   return 0;
+}
+
+
+char fichierRacine[200];
+char fichierToMove[200];
+
+int fileClassifiation(void) {
+  File repertoire = SD.open("/");
+  int fileToMove = 0;
+
+  if (!repertoire) {
+    Serial.println("Failed to open directory");
+    return -1;
+  }
+  if (!repertoire.isDirectory()) {
+    Serial.println("Not a directory");
+    return -1;
+  }
+
+  while (File fichier = repertoire.openNextFile()) {
+    fileToMove = 0;
+    if (hasMp3Extension(fichier.name())) {
+
+      strcpy(fichierRacine, "/");
+      strcat(fichierRacine, fichier.name());
+
+
+
+      if (containsSubstring(fichier.name(), "CO-AC-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Colère/Activités/");
+      }
+      if (containsSubstring(fichier.name(), "CO-BE-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Colère/Bruits blancs et sons de la nature/");
+      }
+      if (containsSubstring(fichier.name(), "CO-HI-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Colère/Histoires audio/");
+      }
+      if (containsSubstring(fichier.name(), "CO-ME-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Colère/Méditations/");
+      }
+      if (containsSubstring(fichier.name(), "CO-MU-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Colère/Musique/");
+      }
+
+
+
+      if (containsSubstring(fichier.name(), "CL-AC-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Contenu libre/Activités/");
+      }
+      if (containsSubstring(fichier.name(), "CL-BE-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Contenu libre/Bruits blancs et sons de la nature/");
+      }
+      if (containsSubstring(fichier.name(), "CL-HI-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Contenu libre/Histoires audio/");
+      }
+      if (containsSubstring(fichier.name(), "CL-ME-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Contenu libre/Méditations/");
+      }
+      if (containsSubstring(fichier.name(), "CL-MU-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Contenu libre/Musique/");
+      }
+
+
+
+      if (containsSubstring(fichier.name(), "JA-AC-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Jalousie/Activités/");
+      }
+      if (containsSubstring(fichier.name(), "JA-BE-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Jalousie/Bruits blancs et sons de la nature/");
+      }
+      if (containsSubstring(fichier.name(), "JA-HI-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Jalousie/Histoires audio/");
+      }
+      if (containsSubstring(fichier.name(), "JA-ME-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Jalousie/Méditations/");
+      }
+      if (containsSubstring(fichier.name(), "JA-MU-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Jalousie/Musique/");
+      }
+
+
+
+      if (containsSubstring(fichier.name(), "RE-AC-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je me réveille de bonne humeur/Activités/");
+      }
+      if (containsSubstring(fichier.name(), "RE-BE-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je me réveille de bonne humeur/Bruits blancs et sons de la nature/");
+      }
+      if (containsSubstring(fichier.name(), "RE-HI-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je me réveille de bonne humeur/Histoires audio/");
+      }
+      if (containsSubstring(fichier.name(), "RE-ME-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je me réveille de bonne humeur/Méditations/");
+      }
+      if (containsSubstring(fichier.name(), "RE-MU-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je me réveille de bonne humeur/Musique/");
+      }
+
+
+
+      if (containsSubstring(fichier.name(), "EN-AC-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je m'endors paisiblement/Activités/");
+      }
+      if (containsSubstring(fichier.name(), "EN-BE-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je m'endors paisiblement/Bruits blancs et sons de la nature/");
+      }
+      if (containsSubstring(fichier.name(), "EN-HI-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je m'endors paisiblement/Histoires audio/");
+      }
+      if (containsSubstring(fichier.name(), "EN-ME-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je m'endors paisiblement/Méditations/");
+      }
+      if (containsSubstring(fichier.name(), "EN-MU-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Je m'endors paisiblement/Musique/");
+      }
+
+
+
+      if (containsSubstring(fichier.name(), "JO-AC-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Joie/Activités/");
+      }
+      if (containsSubstring(fichier.name(), "JO-BE-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Joie/Bruits blancs et sons de la nature/");
+      }
+      if (containsSubstring(fichier.name(), "JO-HI-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Joie/Histoires audio/");
+      }
+      if (containsSubstring(fichier.name(), "JO-ME-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Joie/Méditations/");
+      }
+      if (containsSubstring(fichier.name(), "JO-MU-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Joie/Musique/");
+      }
+
+
+
+      if (containsSubstring(fichier.name(), "MO-AC-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Mon moment à moi/Activités/");
+      }
+      if (containsSubstring(fichier.name(), "MO-BE-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Mon moment à moi/Bruits blancs et sons de la nature/");
+      }
+      if (containsSubstring(fichier.name(), "MO-HI-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Mon moment à moi/Histoires audio/");
+      }
+      if (containsSubstring(fichier.name(), "MO-ME-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Mon moment à moi/Méditations/");
+      }
+      if (containsSubstring(fichier.name(), "MO-MU-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Mon moment à moi/Musique/");
+      }
+
+
+
+      if (containsSubstring(fichier.name(), "PE-AC-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Peur/Activités/");
+      }
+      if (containsSubstring(fichier.name(), "PE-BE-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Peur/Bruits blancs et sons de la nature/");
+      }
+      if (containsSubstring(fichier.name(), "PE-HI-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Peur/Histoires audio/");
+      }
+      if (containsSubstring(fichier.name(), "PE-ME-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Peur/Méditations/");
+      }
+      if (containsSubstring(fichier.name(), "PE-MU-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Peur/Musique/");
+      }
+
+
+
+      if (containsSubstring(fichier.name(), "TR-AC-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Tristesse/Activités/");
+      }
+      if (containsSubstring(fichier.name(), "TR-BE-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Tristesse/Bruits blancs et sons de la nature/");
+      }
+      if (containsSubstring(fichier.name(), "TR-HI-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Tristesse/Histoires audio/");
+      }
+      if (containsSubstring(fichier.name(), "TR-ME-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Tristesse/Méditations/");
+      }
+      if (containsSubstring(fichier.name(), "TR-MU-")) {
+        fileToMove = 1;
+        strcpy(fichierToMove, "/Tristesse/Musique/");
+      }
+
+
+
+      //move file
+      if (fileToMove == 1) {
+        strcat(fichierToMove, fichier.name());
+        renameFile(SD, fichierRacine, fichierToMove);
+        Serial.print("file move :");
+        Serial.print(fichierRacine);
+        Serial.print(" -> ");
+        Serial.println(fichierToMove);
+      }
+
+      fichier.close();
+
+      //reset watchdog
+      esp_task_wdt_reset();
+    }  //if mp3 file
+    
+  }
+  repertoire.close();
+  return 0;
+}
+
+
+bool hasMp3Extension(const char *filename) {
+  // Trouver le point dans le nom du fichier
+  const char *point = strrchr(filename, '.');
+
+  // Vérifier si le point existe et s'il est suivi de "mp3"
+  if (point != NULL && strcmp(point + 1, "mp3") == 0) {
+    return true;
+  }
+
+  return false;
+}
+
+
+
+bool containsSubstring(const char *filename, const char *substring) {
+  return strstr(filename, substring) != NULL;
 }
