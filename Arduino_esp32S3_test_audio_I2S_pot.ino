@@ -185,6 +185,10 @@ String password = "**********************";
 #define WEBSOCKET 0         //default 0
 
 
+#define BATT_LOW 350   //batt low level light 350mV
+#define BATT_HIGH 390  //battery high level light 390mV
+
+
 
 /*
 ____   _________ __________.___   _____ __________.____     ___________ _________
@@ -356,7 +360,10 @@ int analogJackInserted = 0;
 long int analogBatVoltage = 0;  //PIN_BAT_MEAS
 int matAnalogBatVoltage[16];
 long int sumBatVoltage = 0;
-int indiceBatVoltage = 0;
+int indiceBatVoltage = 0;  //mean calculation
+int battLightLevel = 3;    //light batt level 3:full 2:medium 1:low
+int battLowLevel = BATT_LOW;
+int battHighLevel = BATT_HIGH;
 
 //battery
 int chargeStatus = 0;
@@ -1167,7 +1174,7 @@ void loop_veilleuse() {
     //Battery voltage adc@3.3V level 4.2V, 3.9V and 3.5V low limit
     readBatLevel();
 
-    //Charge status
+    //Charge status BMS
     chargeStatus = digitalRead(PIN_CHARGE_STATUS);
 
     if ((oldChargeStatus != chargeStatus) || (firstChargeSatatus == 1)) {
@@ -1982,6 +1989,17 @@ void readBatLevel(void) {
   //Serial.println(analogBatVoltage);
 
   digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
+
+  //light level
+  if (analogBatVoltage < battLowLevel) {
+    battLightLevel = 1;  //low
+  } else {
+    if (analogBatVoltage < battHighLevel) {
+      battLightLevel = 2;  //Medium
+    } else {
+      battLightLevel = 3;  //High
+    }
+  }
 }
 
 
@@ -1993,16 +2011,18 @@ void ledBatteryLevel(void) {
 
   readBatLevel();
 
-  if (analogBatVoltage < 350) {
+  if (battLightLevel == 1) {
     colorR = 1;
     colorG = 0;
     colorB = 0;
   } else {
-    if (analogBatVoltage < 390) {
+    if (battLightLevel == 2) {
+      battLightLevel = 2;  //Medium
       colorR = 0;
       colorG = 1;
       colorB = 0;
     } else {
+      battLightLevel = 3;  //High
       colorR = 0;
       colorG = 1;
       colorB = 0;
@@ -2209,6 +2229,28 @@ void animateLedChargeComplete(void) {
   ii = 0;
   unsigned long localTimeMillis = 0;
   int ki = 0;
+  int colorRed = 0;
+  int colorGreen = 0;
+  int colorBlue = 0;
+
+  if (battLightLevel == 1) {
+    //low red
+    colorRed = 190;
+    colorGreen = 0;
+    colorBlue = 0;
+  }
+  if (battLightLevel == 2) {
+    //medium orange
+    colorRed = 190;
+    colorGreen = 100;
+    colorBlue = 0;
+  }
+  if (battLightLevel == 3) {
+    //high green
+    colorRed = 0;
+    colorGreen = 190;
+    colorBlue = 0;
+  }
 
   powerOnLed();
   while (true) {
@@ -2219,10 +2261,10 @@ void animateLedChargeComplete(void) {
       if (ki >= 12) break;
       if (ii == 0) {
         ii = 1;
-        leds2[0] = CRGB(0, 190, 0);
-        leds2[1] = CRGB(0, 190, 0);
-        leds2[2] = CRGB(0, 190, 0);
-        leds2[3] = CRGB(0, 190, 0);
+        leds2[0] = CRGB(colorRed, colorGreen, colorBlue);
+        leds2[1] = CRGB(colorRed, colorGreen, colorBlue);
+        leds2[2] = CRGB(colorRed, colorGreen, colorBlue);
+        leds2[3] = CRGB(colorRed, colorGreen, colorBlue);
       } else {
         ii = 0;
         leds2[0] = CRGB(0, 0, 0);
@@ -3676,7 +3718,6 @@ int fileClassifiation(void) {
       //reset watchdog
       esp_task_wdt_reset();
     }  //if mp3 file
-    
   }
   repertoire.close();
   return 0;
