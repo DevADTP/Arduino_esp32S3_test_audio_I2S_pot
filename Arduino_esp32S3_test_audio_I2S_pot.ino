@@ -3138,7 +3138,7 @@ void uartConfig(void) {
   }
 
   // Si la chaîne JSON n'est pas vide
-  if ((receivedUartConfig.length() > 0) && (receivedUartConfig.length() < 150) && (updateConfig == 1)) {
+  if ((receivedUartConfig.length() > 0) && (receivedUartConfig.length() < 160) && (updateConfig == 1)) {
     updateConfig = 0;  //update only when receive data
     // Désérialiser le JSON
     DeserializationError error = deserializeJson(jsonConfig, receivedUartConfig);
@@ -3273,7 +3273,7 @@ void uartConfig(void) {
     }
   }
 
-  if (receivedUartConfig.length() > 120) {
+  if (receivedUartConfig.length() > 160) {
     Serial.println("Data format error");
   }
 
