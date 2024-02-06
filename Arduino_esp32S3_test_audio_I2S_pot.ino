@@ -3471,12 +3471,15 @@ int choisirFichierSuivant(const char *cheminDossier) {
 }
 
 
+
+
 char fichierRacine[200];
 char fichierToMove[200];
 
 int fileClassifiation(void) {
   File repertoire = SD.open("/");
   int fileToMove = 0;
+  unsigned long localTimeMillis = 0;
 
   if (!repertoire) {
     Serial.println("Failed to open directory");
@@ -3487,9 +3490,25 @@ int fileClassifiation(void) {
     return -1;
   }
 
+  powerOnLed();
   while (File fichier = repertoire.openNextFile()) {
     fileToMove = 0;
     if (hasMp3Extension(fichier.name())) {
+
+      //rotaring blue light during moving file
+      if (millis() > localTimeMillis) {
+        localTimeMillis = millis() + 200;  //200ms
+
+        leds2[0] = CRGB(0, 0, 0);
+        leds2[1] = CRGB(0, 0, 0);
+        leds2[2] = CRGB(0, 0, 0);
+        leds2[3] = CRGB(0, 0, 0);
+        ii++;
+        if (ii >= 4) ii = 0;
+        leds2[ii] = CRGB(0, 0, 250);
+        FastLED.show();
+        delay(10);
+      }
 
       strcpy(fichierRacine, "/");
       strcat(fichierRacine, fichier.name());
@@ -3719,6 +3738,16 @@ int fileClassifiation(void) {
       esp_task_wdt_reset();
     }  //if mp3 file
   }
+
+  //power off led
+  leds2[0] = CRGB(0, 0, 0);
+  leds2[1] = CRGB(0, 0, 0);
+  leds2[2] = CRGB(0, 0, 0);
+  leds2[3] = CRGB(0, 0, 0);
+  FastLED.show();
+  delay(10);
+
+  powerOffLed();
   repertoire.close();
   return 0;
 }
