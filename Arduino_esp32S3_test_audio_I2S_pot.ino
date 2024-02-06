@@ -3389,6 +3389,9 @@ void change_song_name(void) {
 int choisirFichierAleatoire(const char *cheminDossier) {
   File repertoire = SD.open(cheminDossier);
 
+  // List reading file for not repeating for long name and 1000 files
+  static char fichiersParcourus[100000] = "";
+
   if (!repertoire) {
     Serial.println("Failed to open directory");
     return -1;
@@ -3409,19 +3412,55 @@ int choisirFichierAleatoire(const char *cheminDossier) {
     Serial.println(nextSong);
   }
 
+  // Réinit file list
+  if (nextSong == 0) {
+    fichiersParcourus[0] = '\0';
+  }
+
   while (File fichier = repertoire.openNextFile()) {
+    char nomFichier[200];
+    strcpy(nomFichier, fichier.name());
+    fichier.close();
+
+    // Vérifier si le fichier a déjà été choisi
+    if (strstr(fichiersParcourus, nomFichier) != NULL) {
+      continue;  // Passer au fichier suivant si celui-ci a déjà été choisi
+    }
+
+
     nombreFichiers++;
     if ((random(0, nombreFichiers) == 0)) {
       //fichierChoisi = fichier.name();
-      strcpy(fichierChoisi, "");
-      strcat(fichierChoisi, fichier.name());
+      //strcpy(fichierChoisi, "");
+      //strcat(fichierChoisi, fichier.name());
+      strcpy(fichierChoisi, nomFichier);
     }
-    fichier.close();
+    //fichier.close();
 
     //reset watchdog
     esp_task_wdt_reset();
   }
+
+  // Ajouter le fichier choisi à la liste des fichiers parcourus
+  if (strlen(fichierChoisi) > 0) {
+    strcat(fichiersParcourus, fichierChoisi);
+    strcat(fichiersParcourus, ",");
+  }
+
   repertoire.close();
+
+  // Afficher le fichier choisi (ou le message si aucun fichier trouvé)
+  if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+    if (strlen(fichierChoisi) > 0) {
+      //Serial.print("Fichier choisi : ");
+      //Serial.println(fichierChoisi);
+    } else {
+      Serial.println("Aucun fichier trouvé.");
+    }
+
+    //Serial.print("liste de fichier : ");
+    //Serial.println(fichiersParcourus);
+  }
 
   return 0;
 }
