@@ -185,8 +185,11 @@ String password = "**********************";
 #define WEBSOCKET 0         //default 0
 
 
-#define BATT_LOW 350   //batt low level light 350mV
-#define BATT_HIGH 390  //battery high level light 390mV
+#define BATT_ULTRA_LOW 322  //batt ultra low level light  322 -> 3,5V  317 -> 3,48V ADC stable
+#define BATT_LOW 329        //batt low level light        329 -> 3,56V
+#define BATT_MEDIUM 364     //batt low level light        364 -> 3,93V 70%
+#define BATT_HIGH 389       //battery high level light    389 -> 4,2V
+#define BATT_HYST 1
 
 
 
@@ -360,10 +363,15 @@ int analogJackInserted = 0;
 long int analogBatVoltage = 0;  //PIN_BAT_MEAS
 int matAnalogBatVoltage[16];
 long int sumBatVoltage = 0;
-int indiceBatVoltage = 0;  //mean calculation
-int battLightLevel = 3;    //light batt level 3:full 2:medium 1:low
+int indiceBatVoltage = 0;     //mean calculation
+int battLightLevel = 3;       //light batt level 3:full 2:medium 1:low 0:ultra low
+int battLightLevelOld = -10;  //for update light led if batt level change
+
+int battUltraLowLevel = BATT_ULTRA_LOW;
 int battLowLevel = BATT_LOW;
+int battMedLevel = BATT_MEDIUM;
 int battHighLevel = BATT_HIGH;
+int batHystLevel = BATT_HYST;
 
 //battery
 int chargeStatus = 0;
@@ -490,6 +498,7 @@ void ledlight(void);
 void animateledRot(void);
 void animateledFlip(void);
 void animateLedChargeComplete(void);
+void fadeEffect(int percent_red, int percent_green, int percent_blue, int timeWait, int cycle);
 void animateLedInCharge(void);
 void activeLed(int red, int green, int blue, int brighness, int active);
 int readLightButton(void);
@@ -1020,7 +1029,7 @@ void setup_veilleuse() {
   }
 
   //Led light on startup depending battery level
-  ledBatteryLevel();
+  //ledBatteryLevel();
 
   //led with battery level green >4.1V  yellow >3.8V  red <3.5V
   // while (1) {
@@ -1129,8 +1138,8 @@ void loop_veilleuse() {
     fadeOutLed();
 
     Serial.println("OFF");
-    pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
-    digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+    pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
+    //    digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 input:power OFF switch9
     delay(20);
   }
 
@@ -1181,13 +1190,21 @@ void loop_veilleuse() {
       oldChargeStatus = chargeStatus;
       firstChargeSatatus = 0;
 
-      if (chargeStatus == 0) {
-        //blink red in charge
-        animateLedInCharge();
-      } else {
-        //blink green charge finish
-        animateLedChargeComplete();
-      }
+      battLightLevelOld = -10;
+
+      // if (chargeStatus == 0) {
+      //   //blink red in charge
+      //   animateLedInCharge();
+      // } else {
+      //   //blink green charge finish
+      //   animateLedChargeComplete();
+      // }
+    }
+
+    //led animation if batt level change
+    if (battLightLevelOld != battLightLevel) {
+      battLightLevelOld = battLightLevel;
+      animateLedChargeComplete();
     }
 
     if (WEBSOCKET == 1) {
@@ -1242,6 +1259,7 @@ void loop_veilleuse() {
       //update auto-off if action on any button
       timeoutAutoOff = millis() + timeAutoOff;
       flipLight++;
+      //animateLedChargeComplete();  //Bett info after click light
       ledlight();
 
     } else {
@@ -1266,8 +1284,8 @@ void loop_veilleuse() {
       }
 
       Serial.println("OFF");
-      pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
-      digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+      pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
+      //digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 input:power OFF switch9
       delay(20);
     }
   }
@@ -1991,14 +2009,22 @@ void readBatLevel(void) {
   digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
 
   //light level
-  if (analogBatVoltage < battLowLevel) {
+
+  if (analogBatVoltage <= battUltraLowLevel) {
+    //ultra low levl force power off for preserving battery
+    battLightLevel = 0;  //ultra low
+  }
+
+  if (((battLowLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battLowLevel + batHystLevel))) {
     battLightLevel = 1;  //low
-  } else {
-    if (analogBatVoltage < battHighLevel) {
-      battLightLevel = 2;  //Medium
-    } else {
-      battLightLevel = 3;  //High
-    }
+  }
+
+  if (((battMedLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battMedLevel + batHystLevel))) {
+    battLightLevel = 2;  //Medium
+  }
+
+  if (analogBatVoltage >= battHighLevel - batHystLevel) {
+    battLightLevel = 3;  //High
   }
 }
 
@@ -2011,18 +2037,18 @@ void ledBatteryLevel(void) {
 
   readBatLevel();
 
-  if (battLightLevel == 1) {
+  if (battLightLevel == 1) {  //low batt
     colorR = 1;
     colorG = 0;
     colorB = 0;
   } else {
     if (battLightLevel == 2) {
-      battLightLevel = 2;  //Medium
+      battLightLevel = 2;  //Medium batt
       colorR = 0;
       colorG = 1;
       colorB = 0;
     } else {
-      battLightLevel = 3;  //High
+      battLightLevel = 3;  //Full batt
       colorR = 0;
       colorG = 1;
       colorB = 0;
@@ -2224,6 +2250,57 @@ void animateLedInCharge(void) {
 }
 
 
+void fadeEffect(int percent_red, int percent_green, int percent_blue, int timeWait, int cycle) {
+  int nbCycle = 0;
+  // Fade in/out loop
+  int brightness = 0;
+  int step = 10;
+  unsigned long localTimeMillis = 0;
+
+  powerOnLed();
+  while (true) {
+    esp_task_wdt_reset();
+    //set step
+    if (millis() > localTimeMillis) {
+      localTimeMillis = millis() + timeWait;  //100ms
+
+
+      if ((brightness >= BRIGHTNESS) && (step == 10)) {
+        step = -10;
+      }
+
+      if ((brightness <= 0) && (step == -10)) {
+        step = +10;
+        nbCycle++;
+        if ((nbCycle >= cycle)) break;
+      }
+
+      brightness = brightness + step;
+
+      // Update the brightness of each LED
+      for (int i = 0; i < NUM_LEDS2; i++) {
+        int red = map(percent_red, 0, BRIGHTNESS, 0, brightness);
+        int green = map(percent_green, 0, BRIGHTNESS, 0, brightness);
+        int blue = map(percent_blue, 0, BRIGHTNESS, 0, brightness);
+        leds2[i] = CRGB(red, green, blue);
+      }
+
+      // Serial.print("brightness: ");
+      // Serial.println(brightness);
+
+      FastLED.setBrightness(brightness);
+      FastLED.show();
+    }
+
+    if (AUDIO_ACTIVE == 1) {
+      audio.loop();
+    }
+
+  }  //while
+  powerOffLed();
+  ledlight();
+}
+
 
 void animateLedChargeComplete(void) {
   ii = 0;
@@ -2233,55 +2310,75 @@ void animateLedChargeComplete(void) {
   int colorGreen = 0;
   int colorBlue = 0;
 
-  if (battLightLevel == 1) {
-    //low red
-    colorRed = 190;
-    colorGreen = 0;
-    colorBlue = 0;
-  }
-  if (battLightLevel == 2) {
-    //medium orange
-    colorRed = 190;
-    colorGreen = 100;
-    colorBlue = 0;
-  }
-  if (battLightLevel == 3) {
-    //high green
-    colorRed = 0;
-    colorGreen = 190;
-    colorBlue = 0;
+
+  switch (battLightLevel) {
+    case 1:
+      //low red
+      fadeEffect(100, 0, 0, 50, 1);
+
+      colorRed = 190;
+      colorGreen = 0;
+      colorBlue = 0;
+      break;
+    case 2:
+      //medium orange  255 127
+      fadeEffect(100, 50, 0, 50, 1);
+      colorRed = 190;
+      colorGreen = 95;
+      colorBlue = 0;
+      break;
+    case 3:
+      //high green
+      fadeEffect(0, 100, 0, 50, 1);
+      colorRed = 0;
+      colorGreen = 190;
+      colorBlue = 0;
+      break;
+    default:
+      // ultra low battery power off
+      fadeEffect(100, 0, 0, 10, 4);
+
+      //POWER OFF BATTERY ULTRA LOW
+      pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
+      delay(100);
+
+      colorRed = 190;
+      colorGreen = 0;
+      colorBlue = 0;
+      break;
   }
 
-  powerOnLed();
-  while (true) {
-    esp_task_wdt_reset();
-    if (millis() > localTimeMillis) {
-      localTimeMillis = millis() + 100;  //100ms
-      ki++;
-      if (ki >= 12) break;
-      if (ii == 0) {
-        ii = 1;
-        leds2[0] = CRGB(colorRed, colorGreen, colorBlue);
-        leds2[1] = CRGB(colorRed, colorGreen, colorBlue);
-        leds2[2] = CRGB(colorRed, colorGreen, colorBlue);
-        leds2[3] = CRGB(colorRed, colorGreen, colorBlue);
-      } else {
-        ii = 0;
-        leds2[0] = CRGB(0, 0, 0);
-        leds2[1] = CRGB(0, 0, 0);
-        leds2[2] = CRGB(0, 0, 0);
-        leds2[3] = CRGB(0, 0, 0);
-      }
-      FastLED.show();
-      delay(10);
-    }
+  // powerOnLed();
+  // ki = 0;
+  // while (true) {
+  //   esp_task_wdt_reset();
+  //   if (millis() > localTimeMillis) {
+  //     localTimeMillis = millis() + 100;  //100ms
+  //     ki++;
+  //     if (ki >= 12) break;
+  //     if (ii == 0) {
+  //       ii = 1;
+  //       leds2[0] = CRGB(colorRed, colorGreen, colorBlue);
+  //       leds2[1] = CRGB(colorRed, colorGreen, colorBlue);
+  //       leds2[2] = CRGB(colorRed, colorGreen, colorBlue);
+  //       leds2[3] = CRGB(colorRed, colorGreen, colorBlue);
+  //     } else {
+  //       ii = 0;
+  //       leds2[0] = CRGB(0, 0, 0);
+  //       leds2[1] = CRGB(0, 0, 0);
+  //       leds2[2] = CRGB(0, 0, 0);
+  //       leds2[3] = CRGB(0, 0, 0);
+  //     }
+  //     FastLED.show();
+  //     delay(10);
+  //   }
 
-    if (AUDIO_ACTIVE == 1) {
-      audio.loop();
-    }
-  }
-  powerOffLed();
-  ledlight();
+  //   if (AUDIO_ACTIVE == 1) {
+  //     audio.loop();
+  //   }
+  // }
+  // powerOffLed();
+  // ledlight();
 }
 
 
@@ -2335,7 +2432,7 @@ int readLightButton(void) {
 
   //allow power
   pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
-  digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 low:power OFF switch9
+  digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, HIGH);  //high:power ON switch9 INPUT:power OFF switch9
 
   if (lightLevel == 0) {
     //button realize
@@ -2888,8 +2985,8 @@ void loop_usb() {
     }
 
     //POWER OFF
-    pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, OUTPUT);
-    digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
+    pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
+    //digitalWrite(PIN_POWER_BOARD_SWITCH_LIGHT, LOW);  //high:power ON switch9 low:power OFF switch9
     delay(200);
   }
 
