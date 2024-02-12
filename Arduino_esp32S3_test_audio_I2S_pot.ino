@@ -365,7 +365,7 @@ int matAnalogBatVoltage[16];
 long int sumBatVoltage = 0;
 int adcBatStable = 0;
 int indiceBatVoltage = 0;     //mean calculation
-int battLightLevel = 3;       //light batt level 3:full 2:medium 1:low 0:ultra low
+int battLightLevel = 4;       //light batt level 4:fullfull 3:full 2:medium 1:low 0:ultra low
 int battLightLevelOld = -10;  //for update light led if batt level change
 
 int battUltraLowLevel = BATT_ULTRA_LOW;
@@ -2015,22 +2015,35 @@ void readBatLevel(void) {
 
   //light level
   if (adcBatStable == 32) {
-    if (analogBatVoltage <= battUltraLowLevel) {
-      //ultra low levl force power off for preserving battery
-      battLightLevel = 0;  //ultra low
+
+    if (analogBatVoltage < 322) {
+        battLightLevel = 0;
+    } else if (analogBatVoltage >= 322 && analogBatVoltage < 329) {
+        battLightLevel = 1;
+    } else if (analogBatVoltage >= 329 && analogBatVoltage < 364) {
+        battLightLevel = 2;
+    } else if (analogBatVoltage >= 364 && analogBatVoltage < 389) {
+        battLightLevel = 3;
+    } else {
+        battLightLevel = 4;
     }
 
-    if (((battLowLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battLowLevel + batHystLevel))) {
-      battLightLevel = 1;  //low
-    }
+    // if (analogBatVoltage <= battUltraLowLevel) {
+    //   //ultra low levl force power off for preserving battery
+    //   battLightLevel = 0;  //ultra low
+    // }
 
-    if (((battMedLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battMedLevel + batHystLevel))) {
-      battLightLevel = 2;  //Medium
-    }
+    // if (((battLowLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battLowLevel + batHystLevel))) {
+    //   battLightLevel = 1;  //low
+    // }
 
-    if (analogBatVoltage >= battHighLevel - batHystLevel) {
-      battLightLevel = 3;  //High
-    }
+    // if (((battMedLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battMedLevel + batHystLevel))) {
+    //   battLightLevel = 2;  //Medium
+    // }
+
+    // if (analogBatVoltage >= battHighLevel - batHystLevel) {
+    //   battLightLevel = 3;  //High
+    // }
   }  //stable adc batt measure
 }
 
@@ -2321,36 +2334,25 @@ void animateLedChargeComplete(void) {
     case 1:
       //low red
       fadeEffect(100, 0, 0, 50, 1);
-
-      colorRed = 190;
-      colorGreen = 0;
-      colorBlue = 0;
       break;
     case 2:
       //medium orange  255 127
       fadeEffect(100, 50, 0, 50, 1);
-      colorRed = 190;
-      colorGreen = 95;
-      colorBlue = 0;
       break;
     case 3:
       //high green
       fadeEffect(0, 100, 0, 50, 1);
-      colorRed = 0;
-      colorGreen = 190;
-      colorBlue = 0;
+      break;
+    case 4:
+      //high green
+      fadeEffect(0, 100, 0, 50, 2);
       break;
     default:
       // ultra low battery power off
       fadeEffect(100, 0, 0, 10, 4);
-
       //POWER OFF BATTERY ULTRA LOW
       pinMode(PIN_POWER_BOARD_SWITCH_LIGHT, INPUT);
       delay(100);
-
-      colorRed = 190;
-      colorGreen = 0;
-      colorBlue = 0;
       break;
   }
 
