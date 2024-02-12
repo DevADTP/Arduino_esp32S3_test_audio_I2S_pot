@@ -363,6 +363,7 @@ int analogJackInserted = 0;
 long int analogBatVoltage = 0;  //PIN_BAT_MEAS
 int matAnalogBatVoltage[16];
 long int sumBatVoltage = 0;
+int adcBatStable = 0;
 int indiceBatVoltage = 0;     //mean calculation
 int battLightLevel = 3;       //light batt level 3:full 2:medium 1:low 0:ultra low
 int battLightLevelOld = -10;  //for update light led if batt level change
@@ -1024,7 +1025,7 @@ void setup_veilleuse() {
     Serial.println("read battery");
   }
   //battery level
-  for (i = 0; i < 16; i++) {
+  for (i = 0; i < 32; i++) {
     readBatLevel();
   }
 
@@ -1984,6 +1985,10 @@ void readBatLevel(void) {
 
   //for (int tt = 0; tt < 16; tt++) {
   indiceBatVoltage++;
+
+  adcBatStable++;
+  if (adcBatStable >= 32) adcBatStable = 32;
+
   // analogBatVoltage = analogRead(PIN_BAT_MEAS);  //100k serie 150K
   // delay(1);
   sumBatVoltage = (sumBatVoltage - matAnalogBatVoltage[indiceBatVoltage % 16]);
@@ -2009,23 +2014,24 @@ void readBatLevel(void) {
   digitalWrite(PIN_BAT_MEAS_EN, HIGH);  //HIGH:read bat off LOW:read bat on
 
   //light level
+  if (adcBatStable == 32) {
+    if (analogBatVoltage <= battUltraLowLevel) {
+      //ultra low levl force power off for preserving battery
+      battLightLevel = 0;  //ultra low
+    }
 
-  if (analogBatVoltage <= battUltraLowLevel) {
-    //ultra low levl force power off for preserving battery
-    battLightLevel = 0;  //ultra low
-  }
+    if (((battLowLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battLowLevel + batHystLevel))) {
+      battLightLevel = 1;  //low
+    }
 
-  if (((battLowLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battLowLevel + batHystLevel))) {
-    battLightLevel = 1;  //low
-  }
+    if (((battMedLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battMedLevel + batHystLevel))) {
+      battLightLevel = 2;  //Medium
+    }
 
-  if (((battMedLevel - batHystLevel) <= analogBatVoltage) && (analogBatVoltage <= (battMedLevel + batHystLevel))) {
-    battLightLevel = 2;  //Medium
-  }
-
-  if (analogBatVoltage >= battHighLevel - batHystLevel) {
-    battLightLevel = 3;  //High
-  }
+    if (analogBatVoltage >= battHighLevel - batHystLevel) {
+      battLightLevel = 3;  //High
+    }
+  }  //stable adc batt measure
 }
 
 
