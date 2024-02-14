@@ -185,11 +185,11 @@ String password = "**********************";
 #define WEBSOCKET 0         //default 0
 
 
-#define BATT_ULTRA_LOW 322  //batt ultra low level light  322 -> 3,5V  317 -> 3,48V ADC stable
-#define BATT_LOW 329        //batt low level light        329 -> 3,56V
-#define BATT_MEDIUM 364     //batt low level light        364 -> 3,93V 70%
-#define BATT_HIGH 389       //battery high level light    389 -> 4,2V
-#define BATT_HYST 1
+#define BATT_ULTRA_LOW 320  //batt ultra low level light  322 -> 3,5V  317 -> 3,48V ADC stable  RED STOP
+#define BATT_LOW 329        //batt low level light        329 -> 3,56V  8%  RED
+#define BATT_MEDIUM 340     //batt low level light        364 -> 3,93V 30%  ORANGE
+#define BATT_HIGH 389       //battery high level light    389 -> 4,2V  100% GREEN
+#define BATT_HYST 2
 
 
 
@@ -2016,16 +2016,29 @@ void readBatLevel(void) {
   //light level
   if (adcBatStable == 32) {
 
-    if (analogBatVoltage < 322) {
-        battLightLevel = 0;
-    } else if (analogBatVoltage >= 322 && analogBatVoltage < 329) {
-        battLightLevel = 1;
-    } else if (analogBatVoltage >= 329 && analogBatVoltage < 364) {
-        battLightLevel = 2;
-    } else if (analogBatVoltage >= 364 && analogBatVoltage < 389) {
-        battLightLevel = 3;
-    } else {
-        battLightLevel = 4;
+    // if (analogBatVoltage < battUltraLowLevel) {
+    //   battLightLevel = 0;
+    // } else if ((analogBatVoltage >= battUltraLowLevel) && (analogBatVoltage < battLowLevel)) {
+    //   battLightLevel = 1;
+    // } else if ((analogBatVoltage >= battLowLevel) && (analogBatVoltage < battMedLevel)) {
+    //   battLightLevel = 2;
+    // } else if ((analogBatVoltage >= battMedLevel) && (analogBatVoltage < battHighLevel)) {
+    //   battLightLevel = 3;
+    // } else {
+    //   battLightLevel = 4;
+    // }
+
+    // Mise à jour du niveau actuel en fonction de la lecture de l'ADC avec hystérésis
+    if (analogBatVoltage < (battUltraLowLevel - batHystLevel)) {
+      battLightLevel = 0;
+    } else if ((analogBatVoltage >= battUltraLowLevel) && (analogBatVoltage < (battLowLevel - batHystLevel))) {
+      battLightLevel = 1;
+    } else if ((analogBatVoltage >= battLowLevel) && (analogBatVoltage < (battMedLevel - batHystLevel))) {
+      battLightLevel = 2;
+    } else if ((analogBatVoltage >= battMedLevel) && (analogBatVoltage < (battHighLevel - batHystLevel))) {
+      battLightLevel = 3;
+    } else if (analogBatVoltage >= battHighLevel) {
+      battLightLevel = 4;
     }
 
     // if (analogBatVoltage <= battUltraLowLevel) {
