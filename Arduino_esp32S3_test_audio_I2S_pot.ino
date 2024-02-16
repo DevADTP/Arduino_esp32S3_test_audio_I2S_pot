@@ -275,6 +275,7 @@ int lastButtonNextRandom = HIGH;  // the previous reading from the input pin
 
 int nextSong = 0;
 int modeRandNorm = 1;  //0:normal  1:random
+int backupModeRandom_sleep=1;  //sleep only normal not random
 
 //switch emotion 9 positions
 //switch theme 5 positions
@@ -301,14 +302,14 @@ int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
 //int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 . . . 6 7
 
 //carte 02 S45-2023 -> Dev board cirly
-int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 . . . 6 7
+//int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 . . . 6 7
 
 
 //carte 01 S48-2023 -> livraison 25/01/2024  -> problem boot button   ******************PROBLEM PROBLEM PROBLEM****************************
 //int intMatTheme[8] = { 0, 3015, 1922, 8000, 9000, 10000, 2920, 3492 };  //0 1 2 . . . 6 7
 
 //carte 02 S48-2023 -> Dev board
-//int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 . . . 6 7
+int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 . . . 6 7
 
 //carte 03 S48-2023 -> livraison
 //int intMatTheme[8] = { 0, 3143, 2007, 8000, 9000, 10000, 3041, 3611 };  //0 1 2 . . . 6 7
@@ -452,7 +453,6 @@ char strcrypt[3];
 
 char *inputcrypt = "Mandalou - crypt";  //16bytes packet
 unsigned char outputcrypt[16] = { 0 };
-;
 //char strcrypt[3];
 
 
@@ -610,6 +610,7 @@ void setup() {
   // Note: Key name is limited to 15 chars.
   bootMode2 = preferences.getUInt("bootmode", 0);
   modeRandNorm = preferences.getUInt("audioread", 1);  //random if not define
+  backupModeRandom_sleep=modeRandNorm;
 
   //new prefs
   intMatTheme[1] = preferences.getUInt("th1", 0);
@@ -1400,6 +1401,7 @@ void loop_veilleuse() {
 
         //flip normal/random
         modeRandNorm = modeRandNorm ^ 1;
+        backupModeRandom_sleep=modeRandNorm;
         if (modeRandNorm == 0) {
           Serial.println("Normal mode read song");
           //preference on flash data etain after reboot
@@ -1413,6 +1415,7 @@ void loop_veilleuse() {
         } else {
           Serial.println("Random mode read song");
           modeRandNorm = 1;
+          backupModeRandom_sleep=modeRandNorm;
           //preference on flash data etain after reboot
           preferences.begin("my-app", false);
           // Store the counter to the Preferences
@@ -2113,6 +2116,7 @@ void fadeInLed(void) {
     for (i = 0; i < NUM_LEDS2; i++) {
       leds2[i] = CRGB(0, 0, ii);
     }
+    FastLED.setBrightness(200);
     FastLED.show();
     delay(100);
     esp_task_wdt_reset();
@@ -2133,6 +2137,7 @@ void fadeOutLed(void) {
   for (i = 0; i < NUM_LEDS2; i++) {
     leds2[i] = CRGB(0, 0, 150);
   }
+  FastLED.setBrightness(200);
   FastLED.show();
   delay(1000);
   for (ii = 250; ii >= 0; ii = ii - 10) {
@@ -2154,15 +2159,15 @@ void ledlight(void) {
   switch (flipLight) {
     case 1:
       // light warm low
-      activeLed(255, 255, 0, 50, 1);  // red,  green,  blue,  brighness, active
+      activeLed(255, 200, 0, 10, 1);  // red,  green,  blue,  brighness, active
       break;
     case 2:
       // light warm medium
-      activeLed(255, 255, 0, 150, 1);  // red,  green,  blue,  brighness, active
+      activeLed(255, 200, 0, 80, 1);  // red,  green,  blue,  brighness, active
       break;
     case 3:
       // light warm high
-      activeLed(255, 255, 0, 200, 1);  // red,  green,  blue,  brighness, active
+      activeLed(255, 200, 0, 200, 1);  // red,  green,  blue,  brighness, active
       break;
     default:
       // light off
@@ -3352,7 +3357,7 @@ void uartConfig(void) {
         Serial.println(preferences.getUInt("th1", 0));
         Serial.print("th2:");
         Serial.println(preferences.getUInt("th2", 0));
-        Serial.print("v:");
+        Serial.print("th3:");
         Serial.println(preferences.getUInt("th6", 0));
         Serial.print("th7:");
         Serial.println(preferences.getUInt("th7", 0));
@@ -3403,6 +3408,8 @@ char fichierChoisi[200];
 void change_song_name(void) {
   char local_name_directory[200] = "";
 
+  modeRandNorm=backupModeRandom_sleep;
+
   //get emotion intDirEmotion, intthemeChoice
   switch (intNumeroDossier) {
     case 1:
@@ -3424,6 +3431,7 @@ void change_song_name(void) {
     case 5:
       // Je m'endors paisiblement
       sprintf(local_name_directory, "/Je m'endors paisiblement");
+      //modeRandNorm=0;  //force normal mode for sleep
       break;
     case 6:
       // Je me réveille de bonne humeur
