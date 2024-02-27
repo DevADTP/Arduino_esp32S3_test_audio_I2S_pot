@@ -305,11 +305,11 @@ int intMatSelect[10] = { 0, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
 //int intMatTheme[8] = { 0, 3045, 1939, 8000, 9000, 10000, 2950, 3532 };  //0 1 2 . . . 6 7
 
 
-//carte 01 S48-2023 -> livraison 25/01/2024  -> problem boot button   ******************PROBLEM PROBLEM PROBLEM****************************
+//carte 01 S48-2023 -> livraison 25/01/2024  -> problem boot button   ****************** OK DIODE RESOLVE PROBLEM ****************************
 //int intMatTheme[8] = { 0, 3015, 1922, 8000, 9000, 10000, 2920, 3492 };  //0 1 2 . . . 6 7
 
 //carte 02 S48-2023 -> Dev board
-int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 . . . 6 7
+//int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 . . . 6 7
 
 //carte 03 S48-2023 -> livraison
 //int intMatTheme[8] = { 0, 3143, 2007, 8000, 9000, 10000, 3041, 3611 };  //0 1 2 . . . 6 7
@@ -323,16 +323,16 @@ int intMatTheme[8] = { 0, 3021, 1927, 8000, 9000, 10000, 2923, 3495 };  //0 1 2 
 //carte 06 S48-2023 -> livraison 25/01/2024
 //int intMatTheme[8] = { 0, 3123, 1992, 8000, 9000, 10000, 3020, 3606 };  //0 1 2 . . . 6 7
 
-//carte 07 S48-2023 -> livraison 25/01/2024 -> probleme CC            ******************PROBLEM PROBLEM PROBLEM CC ************************
-//int intMatTheme[8] = { 0, xxxx, xxxx, 8000, 9000, 10000, xxxx, xxxx };  //0 1 2 . . . 6 7
+//carte 07 S48-2023 -> livraison 25/01/2024 -> probleme CC            ******************OK BOF CC carte SD  PROBLEM CC ************************
+//int intMatTheme[8] = { 0, 3087, 1970, 8000, 9000, 10000, 2989, 3548 };  //0 1 2 . . . 6 7
 
-//carte 08 S48-2023 -> livraison 25/01/2024  -> problem boot button   ******************PROBLEM PROBLEM PROBLEM****************************
-//int intMatTheme[8] = { 0, 3109, 1980, 8000, 9000, 10000, 3012, 3570 };  //0 1 2 . . . 6 7
+//carte 08 S48-2023 -> livraison 25/01/2024  -> problem boot button   ****************** OK DIODE RESOLVE PROBLEM ****************************
+int intMatTheme[8] = { 0, 3089, 1971, 8000, 9000, 10000, 2987, 3553 };  //0 1 2 . . . 6 7
 
 //carte 09 S48-2023 -> livraison
 //int intMatTheme[8] = { 0, 3150, 2013, 8000, 9000, 10000, 3050, 3628 };  //0 1 2 . . . 6 7
 
-//carte 10 S48-2023 -> livraison 25/01/2024  -> problem boot button   ******************PROBLEM PROBLEM PROBLEM****************************
+//carte 10 S48-2023 -> livraison 25/01/2024  -> problem boot button   ****************** OK DIODE RESOLVE PROBLEM ****************************
 //int intMatTheme[8] = { 0, 3191, 2037, 8000, 9000, 10000, 3094, 3652 };  //0 1 2 . . . 6 7
 
 //carte 11 S48-2023 -> livraison 25/01/2024
