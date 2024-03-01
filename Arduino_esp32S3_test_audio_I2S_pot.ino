@@ -185,10 +185,10 @@ String password = "**********************";
 #define WEBSOCKET 0         //default 0
 
 
-#define BATT_ULTRA_LOW 320  //batt ultra low level light  322 -> 3,5V  317 -> 3,48V ADC stable  RED STOP
-#define BATT_LOW 329        //batt low level light        329 -> 3,56V  8%  RED
-#define BATT_MEDIUM 340     //batt low level light        364 -> 3,93V 30%  ORANGE
-#define BATT_HIGH 389       //battery high level light    389 -> 4,2V  100% GREEN
+#define BATT_ULTRA_LOW 347  //batt ultra low level light  322 -> 3,5V  317 -> 3,48V ADC stable  RED STOP
+#define BATT_LOW 350        //batt low level light        329 -> 3,56V  8%  RED
+#define BATT_MEDIUM 354     //batt low level light        364 -> 3,93V 30%  ORANGE
+#define BATT_HIGH 419       //battery high level light    389 -> 4,2V  100% GREEN
 #define BATT_HYST 2
 
 
@@ -274,8 +274,8 @@ int lastButtonNext = HIGH;        // the previous reading from the input pin
 int lastButtonNextRandom = HIGH;  // the previous reading from the input pin
 
 int nextSong = 0;
-int modeRandNorm = 1;  //0:normal  1:random
-int backupModeRandom_sleep=1;  //sleep only normal not random
+int modeRandNorm = 1;            //0:normal  1:random
+int backupModeRandom_sleep = 1;  //sleep only normal not random
 
 //switch emotion 9 positions
 //switch theme 5 positions
@@ -374,6 +374,8 @@ int battLowLevel = BATT_LOW;
 int battMedLevel = BATT_MEDIUM;
 int battHighLevel = BATT_HIGH;
 int batHystLevel = BATT_HYST;
+
+int batMaxAdc = 370;
 
 //battery
 int chargeStatus = 0;
@@ -610,7 +612,7 @@ void setup() {
   // Note: Key name is limited to 15 chars.
   bootMode2 = preferences.getUInt("bootmode", 0);
   modeRandNorm = preferences.getUInt("audioread", 1);  //random if not define
-  backupModeRandom_sleep=modeRandNorm;
+  backupModeRandom_sleep = modeRandNorm;
 
   //new prefs
   intMatTheme[1] = preferences.getUInt("th1", 0);
@@ -628,6 +630,8 @@ void setup() {
 
   timeAutoOff = preferences.getUInt("autooff", 60);  //default 60 min
   timeAutoOff = timeAutoOff * 60000;
+
+  batMaxAdc = preferences.getUInt("bat", 370);  //batterie max
 
   // Increase counter by 1
   //bootMode2++;
@@ -1401,7 +1405,7 @@ void loop_veilleuse() {
 
         //flip normal/random
         modeRandNorm = modeRandNorm ^ 1;
-        backupModeRandom_sleep=modeRandNorm;
+        backupModeRandom_sleep = modeRandNorm;
         if (modeRandNorm == 0) {
           Serial.println("Normal mode read song");
           //preference on flash data etain after reboot
@@ -1415,7 +1419,7 @@ void loop_veilleuse() {
         } else {
           Serial.println("Random mode read song");
           modeRandNorm = 1;
-          backupModeRandom_sleep=modeRandNorm;
+          backupModeRandom_sleep = modeRandNorm;
           //preference on flash data etain after reboot
           preferences.begin("my-app", false);
           // Store the counter to the Preferences
@@ -2030,6 +2034,23 @@ void readBatLevel(void) {
     // } else {
     //   battLightLevel = 4;
     // }
+
+    //update batmax level
+    if ((analogBatVoltage > batMaxAdc) && (analogBatVoltage != 0)) {
+      batMaxAdc = analogBatVoltage;  //batterie max
+
+      if ((DEBUG_UART == 1) || (uartdbg == 1) || (uartdbg == 2)) {
+        Serial.print("Update pref bat:");
+        Serial.println(batMaxAdc);
+      }
+      // Save preference
+      preferences.begin("my-app", false);
+      preferences.putUInt("bat", batMaxAdc);
+      // Close the Preferences
+      preferences.end();
+    }
+    analogBatVoltage = analogBatVoltage * 420 / batMaxAdc;
+
 
     // Mise à jour du niveau actuel en fonction de la lecture de l'ADC avec hystérésis
     if (analogBatVoltage < (battUltraLowLevel - batHystLevel)) {
@@ -3286,6 +3307,8 @@ void uartConfig(void) {
       gainHp = jsonConfig["gh"];
       gainCasq = jsonConfig["gc"];
 
+      int batmax = jsonConfig["bat"];
+
       int timeAutoOffuart = jsonConfig["autooff"];
 
 
@@ -3346,6 +3369,11 @@ void uartConfig(void) {
           preferences.putUInt("uartdbg", uartdbg);
         }
 
+        if (batmax != 0) {
+          batMaxAdc = batmax;
+          preferences.putUInt("bat", batmax);
+        }
+
         //read prefs
         Serial.print("bootmode:");
         Serial.println(preferences.getUInt("bootmode", 0));
@@ -3374,13 +3402,14 @@ void uartConfig(void) {
         Serial.print("gc:");
         Serial.println(preferences.getUInt("gc", 0));
 
-        Serial.print("gc:");
-        Serial.println(preferences.getUInt("gc", 0));
+        Serial.print("bat:");
+        Serial.println(preferences.getUInt("bat", 370));
 
         Serial.print("autooff:");
         Serial.println(preferences.getUInt("autooff", 0));
 
         //reload data
+        batMaxAdc = preferences.getUInt("bat", 370);  //batterie max
         verSw = preferences.getUInt("sw", 0);
         verHw = preferences.getUInt("hw", 0);
         gainHp = preferences.getUInt("gh", 0);
@@ -3408,7 +3437,7 @@ char fichierChoisi[200];
 void change_song_name(void) {
   char local_name_directory[200] = "";
 
-  modeRandNorm=backupModeRandom_sleep;
+  modeRandNorm = backupModeRandom_sleep;
 
   //get emotion intDirEmotion, intthemeChoice
   switch (intNumeroDossier) {
